@@ -6,6 +6,8 @@ from pathlib import Path
 import cadquery as cq
 import numpy as np
 from OCP.BRep import BRep_Tool
+from OCP.Bnd import Bnd_Box
+from OCP.BRepBndLib import BRepBndLib
 from OCP.GeomAbs import GeomAbs_C0
 from OCP.StlAPI import StlAPI_Reader
 from OCP.TopoDS import TopoDS_Shape
@@ -28,6 +30,13 @@ def valid(shape, solid=True):
     if solid and (not shape.Solids() or shape.Volume() <= 1e-8):
         raise CadError("Operacja nie utworzyła zamkniętej bryły. Sprawdź położenie i wymiary.")
     return shape
+
+
+def bounds(shape):
+    # Measurements must not depend on the display tessellation's deflection.
+    box = Bnd_Box()
+    BRepBndLib.AddOptimal_s(shape.wrapped, box, False, False)
+    return cq.BoundBox(box)
 
 
 def box(x, y, z):
@@ -109,12 +118,12 @@ def blend(shape, indices, size, kind="fillet"):
 
 def hole(shape, radius, x, y, depth=0):
     radius = positive(radius, "Promień otworu")
-    bounds = shape.BoundingBox()
+    box_bounds = bounds(shape)
     depth = float(depth)
     if depth < 0 or not isfinite(depth):
         raise CadError("Głębokość musi być dodatnia lub równa zero dla otworu przelotowego.")
-    height = bounds.zlen + 2 if depth == 0 else positive(depth) + 1
-    bottom = bounds.zmin - 1 if depth == 0 else bounds.zmax - depth
+    height = box_bounds.zlen + 2 if depth == 0 else positive(depth) + 1
+    bottom = box_bounds.zmin - 1 if depth == 0 else box_bounds.zmax - depth
     tool = cq.Solid.makeCylinder(radius, height, (float(x), float(y), bottom))
     result = boolean("subtract", shape, [tool])
     if shape.Volume() - result.Volume() < 1e-6:
@@ -208,7 +217,7 @@ def display_mesh(shape, tolerance=.12):
         count = 2 if edge.geomType() == "LINE" else min(256, max(24, int(length / .5)))
         points = edge.positions(np.linspace(0, 1, count))
         edges[i] = np.asarray([p.toTuple() for p in points], dtype=np.float32)
-    bounds = shape.BoundingBox()
+    box_bounds = bounds(shape)
     return DisplayMesh(np.asarray([v.toTuple() for v in vertices], dtype=np.float32).reshape(-1, 3),
                        np.asarray(triangles, dtype=np.uint32).reshape(-1, 3), edges,
-                       bounds.center.toTuple(), max(bounds.xlen, bounds.ylen, bounds.zlen, 1))
+                       box_bounds.center.toTuple(), max(box_bounds.xlen, box_bounds.ylen, box_bounds.zlen, 1))

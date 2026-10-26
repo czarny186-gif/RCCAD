@@ -108,6 +108,21 @@ class NativeUiTests(unittest.TestCase):
             self.wait();self.assertEqual(len(self.window.document.bodies),2)
             self.assertEqual(self.warning_mock.call_count,0)
 
+    def test_projection_ray_and_visible_edge_picking(self):
+        import numpy as np
+        self.add_box();view=self.window.view;view.resize(800,600)
+        body=self.window.document.bodies[0];view.fit_all()
+        candidates=[]
+        for points in body.mesh.edges.values():
+            xy,_,_=view.project_points(points)
+            midpoint=(xy[0]+xy[-1])/2
+            ray=view._ray(*midpoint)
+            self.assertIsNotNone(ray)
+            if (hit:=view.nearest_edge(*midpoint)) is not None:
+                candidates.append(hit)
+        self.assertTrue(candidates)
+        self.assertTrue(all(hit[0]==body.id and hit[1] in body.mesh.edges for hit in candidates))
+
     def test_visibility_is_reversible(self):
         self.add_box()
         item=self.window.tree.topLevelItem(0)

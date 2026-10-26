@@ -43,6 +43,10 @@ def run(report_path=None):
     app=QApplication.instance() or QApplication([])
     window=MainWindow();window.document=doc;window.selected=[body.id];window.refresh()
     assert window.tree.topLevelItemCount()==1 and 'Objętość' in window.properties.text()
+    window.view.resize(800,600);window.view.fit_all()
+    projected,_,_=window.view.project_points(body.mesh.vertices[:3])
+    assert window.view._ray(float(projected[0][0]),float(projected[0][1])) is not None
+    checks.append('Qt coordinate projection and picking ray')
     window.document._saved_revision=window.document._revision
     window.close();app.processEvents()
     checks.append('Qt native window, object tree and properties')

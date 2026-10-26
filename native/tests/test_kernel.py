@@ -94,6 +94,22 @@ class KernelTests(unittest.TestCase):
             self.assertEqual(imported[0][1],'mesh')
             self.assertGreater(len(k.display_mesh(imported[0][0]).triangles),0)
 
+    def test_exact_measurements_and_blind_hole_after_tessellation(self):
+        shape=k.box(30,30,30);k.display_mesh(shape)
+        bounds=k.bounds(shape)
+        self.assertAlmostEqual(bounds.xlen,30,places=6)
+        self.assertAlmostEqual(bounds.zmax,30,places=6)
+        self.assertAlmostEqual(k.hole(shape,4,15,15,10).Volume(),27000-math.pi*16*10,places=5)
+
+    def test_dxf_sketch_roundtrip(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'profile.dxf'
+            k.export_shapes([k.sketch('rectangle','XY',20,10)],path)
+            imported=k.import_shapes(path)
+            self.assertEqual(len(imported),1)
+            self.assertEqual(imported[0][1],'sketch')
+            self.assertAlmostEqual(k.extrude(imported[0][0],'XY',5).Volume(),1000,places=4)
+
     def test_wire_display_has_edges(self):
         mesh=k.display_mesh(k.sketch('rectangle','XY',20,10))
         self.assertEqual(len(mesh.edges),4)

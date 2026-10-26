@@ -88,10 +88,14 @@ class CadView(gl.GLViewWidget):
         el, az = values[name]
         self.setCameraPosition(elevation=el, azimuth=az)
 
+    def camera_matrix(self):
+        viewport = (0, 0, max(1,self.width()), max(1,self.height()))
+        return self.projectionMatrix(viewport,viewport) * self.viewMatrix()
+
     def project_points(self, points):
         # Explicit Qt matrix data avoid NumPy/Qt row-major ambiguity.
-        matrix = self.projectionMatrix() * self.viewMatrix()
-        m = np.array([[matrix.row(i)[j] for j in range(4)] for i in range(4)])
+        matrix = self.camera_matrix()
+        m = np.array([[r.x(), r.y(), r.z(), r.w()] for r in (matrix.row(i) for i in range(4))])
         homogeneous = np.column_stack((points, np.ones(len(points)))) @ m.T
         w = homogeneous[:, 3]
         safe = np.where(np.abs(w) > 1e-12, w, np.nan)
@@ -125,14 +129,14 @@ class CadView(gl.GLViewWidget):
         return best
 
     def _ray(self, x, y):
-        inverse, ok = (self.projectionMatrix() * self.viewMatrix()).inverted()
+        inverse, ok = (self.camera_matrix()).inverted()
         if not ok:
             return None
         from PySide6.QtGui import QVector4D
         pts = []
         for z in (-1, 1):
-            p = inverse * QVector4D(2*x/self.width()-1, 1-2*y/self.height(), z, 1)
-            pts.append(np.array([p.x(), p.y(), p.z()]) / p.w())
+            p = inverse.map(QVector3D(float(2*x/self.width()-1), float(1-2*y/self.height()), float(z)))
+            pts.append(np.array([p.x(), p.y(), p.z()]))
         direction = pts[1] - pts[0]
         return pts[0], direction / np.linalg.norm(direction)
 

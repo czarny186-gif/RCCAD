@@ -6,11 +6,13 @@ nie pełny zamiennik wszystkich narzędzi starszego pliku HTML.
 
 ## Pobranie EXE
 
-W repozytorium otwórz **Actions → RCCAD Desktop - Windows EXE → najnowszy udany
-przebieg → Artifacts → RCCAD-Desktop-Windows-x64**. Pobranie artefaktu GitHub
-wymaga zalogowania. Rozpakuj pobrany plik ZIP, a następnie zawarte w nim archiwum
-aplikacji. Uruchom **RCCAD Desktop.exe**. Zachowaj obok niego cały katalog
+W repozytorium otwórz **Releases → RCCAD Desktop 0.1 — Windows x64** i pobierz
+**RCCAD-Desktop-Windows-x64.zip**. Rozpakuj archiwum w całości i uruchom
+**RCCAD Desktop.exe** z folderu `RCCAD Desktop`. Zachowaj obok niego cały katalog
 `_internal`; sam plik EXE nie zawiera bibliotek aplikacji.
+
+Każdy build jest także dostępny w **Actions → RCCAD Desktop - Windows EXE →
+udany przebieg → Artifacts** (ten wariant pobrania wymaga zalogowania na GitHub).
 
 Wydanie nie jest podpisane certyfikatem wydawcy. Nie wymaga lokalnego Pythona.
 Wymagany jest sterownik obsługujący OpenGL 2.1 lub nowszy. Zestaw budowania

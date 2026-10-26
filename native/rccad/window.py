@@ -246,7 +246,7 @@ class MainWindow(QMainWindow):
         self.edge_count.setText(f"Zaznaczone krawędzie: {sum(map(len,self.edges.values()))}\nShift + klik dodaje kolejne.")
         body = self.document.get(self.selected[0]) if self.selected else None
         if body:
-            bounds = body.shape.BoundingBox()
+            bounds = kernel.bounds(body.shape)
             volume = f"\nObjętość: {body.shape.Volume():,.3f} mm³" if body.kind == 'solid' else ''
             self.properties.setText(f"{body.name}\nWymiary: {bounds.xlen:.3f} × {bounds.ylen:.3f} × {bounds.zlen:.3f} mm{volume}\nKrawędzie: {len(body.shape.Edges())}")
         else:

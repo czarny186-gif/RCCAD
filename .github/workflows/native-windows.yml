@@ -46,6 +46,7 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item README.md,THIRD_PARTY.md -Destination 'dist\RCCAD Desktop'
+          Copy-Item packaged-selftest.json -Destination 'dist\RCCAD Desktop\selftest_windows.json'
           Compress-Archive -Path 'dist\RCCAD Desktop' -DestinationPath RCCAD-Desktop-Windows-x64.zip
       - uses: actions/upload-artifact@v4
         with:
@@ -62,3 +63,31 @@ jobs:
             native/packaged-selftest.json
             native/build/RCCAD/warn-RCCAD.txt
           if-no-files-found: ignore
+
+  publish-preview:
+    needs: windows-exe
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: RCCAD-Desktop-Windows-x64
+          path: release
+      - name: Publish the tested Windows preview
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          release_tag="desktop-v0.1.0-${GITHUB_RUN_NUMBER}"
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" release/*.zip --clobber
+          else
+            gh release create "$release_tag" release/*.zip \
+              --target "$GITHUB_SHA" --prerelease \
+              --title "RCCAD Desktop 0.1 — Windows x64" \
+              --notes-file native/RELEASE_NOTES.md
+          fi
