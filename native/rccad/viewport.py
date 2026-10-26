@@ -3,6 +3,7 @@ from __future__ import annotations
 import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
+from pyqtgraph.opengl import shaders
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QVector3D
 from .document import Body
@@ -15,6 +16,21 @@ class CadView(gl.GLViewWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        if 'rccad' not in shaders.ShaderProgram.names:
+            shaders.ShaderProgram('rccad', [
+                shaders.VertexShader(shaders.getShaderProgram('shaded').shaders[0].code),
+                shaders.FragmentShader("""
+                    #ifdef GL_ES
+                    precision mediump float;
+                    #endif
+                    varying vec4 v_color;
+                    varying vec3 v_normal;
+                    void main() {
+                        float diffuse = max(0.0, dot(normalize(v_normal), normalize(vec3(0.3, 0.6, 1.0))));
+                        gl_FragColor = vec4(v_color.rgb * (0.58 + 0.42 * diffuse), v_color.a);
+                    }
+                """),
+            ])
         self.setBackgroundColor('#edf1f5')
         self.setCameraPosition(distance=120, elevation=25, azimuth=-55)
         grid = gl.GLGridItem()
@@ -44,7 +60,7 @@ class CadView(gl.GLViewWidget):
             mesh = body.mesh
             color = (.30, .53, .76, 1) if body.id in self.selected_bodies else (.64, .67, .72, 1)
             if len(mesh.triangles):
-                item = gl.GLMeshItem(vertexes=mesh.vertices, faces=mesh.triangles, smooth=True, color=color, shader='shaded', drawEdges=False)
+                item = gl.GLMeshItem(vertexes=mesh.vertices, faces=mesh.triangles, smooth=True, color=color, shader='rccad', drawEdges=False)
                 item.setGLOptions('opaque')
                 self.addItem(item)
                 self.model_items.append(item)
@@ -99,6 +115,8 @@ class CadView(gl.GLViewWidget):
                 projected = a + delta * t[:, None]
                 dist = np.linalg.norm(projected - [x, y], axis=1)
                 dist[(w[:-1] <= 0) | (w[1:] <= 0)] = np.inf
+                if not np.isfinite(dist).any():
+                    continue
                 j = int(np.nanargmin(dist))
                 if dist[j] < distance:
                     world = points[j] + (points[j + 1] - points[j]) * t[j]

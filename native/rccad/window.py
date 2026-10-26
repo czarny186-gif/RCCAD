@@ -3,13 +3,13 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 import traceback
-from PySide6.QtCore import Qt, QObject, Signal, QRunnable, QThreadPool
+from PySide6.QtCore import Qt, QObject, Signal, QRunnable, QThreadPool, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDockWidget,
     QTreeWidget, QTreeWidgetItem, QAbstractItemView, QToolBar, QDoubleSpinBox,
     QPushButton, QComboBox, QFormLayout, QDialog, QDialogButtonBox,
-    QFileDialog, QMessageBox, QCheckBox, QProgressBar, QStyle,
+    QFileDialog, QMessageBox, QCheckBox, QProgressBar, QStyle, QHeaderView,
 )
 from . import __version__, kernel
 from .document import Body, Document
@@ -156,12 +156,15 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(panel)
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Obiekt", "Typ"])
+        self.tree.header().setSectionResizeMode(0,QHeaderView.Stretch)
+        self.tree.header().setSectionResizeMode(1,QHeaderView.ResizeToContents)
         self.tree.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.tree.itemSelectionChanged.connect(self.tree_selection)
         self.tree.itemChanged.connect(self.visibility_changed)
         layout.addWidget(self.tree, 1)
         self.properties = QLabel("Dodaj bryłę albo utwórz szkic.")
         self.properties.setWordWrap(True)
+        self.properties.setTextFormat(Qt.PlainText)
         self.properties.setMinimumHeight(110)
         self.properties.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.properties)
@@ -411,14 +414,14 @@ class MainWindow(QMainWindow):
         if self.busy:return
         ids=[item.data(0,Qt.UserRole) for item in self.tree.selectedItems()]
         self.selected=[i for i in self.selected if i in ids]+[i for i in ids if i not in self.selected]
-        self.edges={};self.refresh()
+        self.edges={};QTimer.singleShot(0,self.refresh)
 
     def visibility_changed(self, item, column):
         if self.busy:return
         identifier=item.data(0,Qt.UserRole)
         body=self.document.get(identifier)
         if body:
-            self.document.commit([replace(b,visible=item.checkState(0)==Qt.Checked,name=item.text(0)) if b.id==identifier else b for b in self.document.bodies]);self.refresh()
+            self.document.commit([replace(b,visible=item.checkState(0)==Qt.Checked,name=item.text(0)) if b.id==identifier else b for b in self.document.bodies]);QTimer.singleShot(0,self.refresh)
 
     def undo(self):
         if not self.busy:self.document.undo();self.edges={};self.refresh()
@@ -469,6 +472,11 @@ class MainWindow(QMainWindow):
         if not bodies:QMessageBox.information(self,'Eksport','Brak geometrii do eksportu.');return
         path,_=QFileDialog.getSaveFileName(self,'Eksportuj zaznaczone lub widoczne obiekty','Model.step','STEP (*.step);;STL (*.stl);;BREP (*.brep);;DXF — szkice (*.dxf)')
         if path:self.run_operation('Eksportowanie',lambda:kernel.export_shapes([b.shape for b in bodies],path),lambda _:None)
+
+    def keyPressEvent(self,event):
+        if event.key()==Qt.Key_Escape and not self.busy:
+            self.end_blend();event.accept();return
+        super().keyPressEvent(event)
 
     def closeEvent(self,event):
         if self.confirm_discard():event.accept()
