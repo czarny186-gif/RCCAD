@@ -2437,7 +2437,76 @@ function convexEdgeSurgery(s,chain,size,type){
  return solidBadEdges(r)===0&&v1>0&&v1<v0-1e-8?r:null;
 }
 
+// Find three equal-radius, perpendicular outer blends from geometry, including
+// older saved projects without operation metadata. A chamfer is not a blend.
+function roundedCornerCandidates(s){
+ const N=solidNormals(s),V=s.vertices,groups=[];
+ for(let f=0;f<s.faces.length;f++){
+  if((f&31)===0)modGeometryCheck();
+  const pts=s.faces[f].map(i=>V[i]),area=V3.len(polyNormal(pts))/2,n=N[f],w=V3.dot(n,pts[0]);
+  let g=groups.find(g=>V3.dot(g.n,n)>1-1e-8&&Math.abs(g.w-w)<1e-5);
+  if(!g){g={n,w,area:0,vertices:new Set()};groups.push(g);}g.area+=area;for(const i of s.faces[f])g.vertices.add(i);
+ }
+ const max=groups.reduce((m,g)=>Math.max(m,g.area),0);
+ const planes=groups.filter(g=>{modGeometryCheck();return g.area>max*.08&&V.every(p=>V3.dot(g.n,p)<=g.w+1e-5);});
+ const out=[],gap=(a,b)=>[...a.vertices].reduce((m,i)=>Math.min(m,b.w-V3.dot(b.n,V[i])),Infinity);
+ for(let i=0;i<planes.length;i++)for(let j=i+1;j<planes.length;j++)for(let k=j+1;k<planes.length;k++){
+  modGeometryCheck();const p=[planes[i],planes[j],planes[k]],n=p.map(p=>p.n);
+  if(Math.abs(V3.dot(n[0],n[1]))>1e-5||Math.abs(V3.dot(n[0],n[2]))>1e-5||Math.abs(V3.dot(n[1],n[2]))>1e-5)continue;
+  const radii=[gap(p[0],p[1]),gap(p[1],p[0]),gap(p[0],p[2]),gap(p[2],p[0]),gap(p[1],p[2]),gap(p[2],p[1])],r=radii.reduce((a,b)=>a+b,0)/6;
+  if(r<1e-4||radii.some(x=>Math.abs(x-r)>Math.max(1e-4,r*.002)))continue;
+  const corner=n.reduce((c,v,a)=>V3.add(c,V3.mul(v,p[a].w)),[0,0,0]);
+  let curved=true;
+  for(const [a,b,c] of [[0,1,2],[0,2,1],[1,2,0]]){
+   const dirs=new Set();
+   for(let f=0;f<s.faces.length;f++){const q=N[f],x=V3.dot(q,n[a]),y=V3.dot(q,n[b]);
+    if(x<.12||y<.12||Math.abs(V3.dot(q,n[c]))>1e-5)continue;
+    if(s.faces[f].some(i=>{const d=p[c].w-V3.dot(n[c],V[i]);return d>=-1e-5&&d<r*1.5;}))dirs.add(Math.round(Math.atan2(y,x)*1000));
+   }
+   if(dirs.size<3){curved=false;break;}
+  }
+  if(curved)out.push({corner,n,r});
+ }
+ return out;
+}
+// Replace the intersection of three edge cylinders with their common ball blend.
+// The old cylindrical seams are real creases; hiding their lines would leave the
+// defect in STL/STEP. Tangent clipping creates a smooth, closed corner patch.
+function blendRoundedCorners(s){
+ const corners=roundedCornerCandidates(s);if(!corners.length)return s;
+ let polys=meshFacePts(s),changed=false;
+ for(const {corner,n,r} of corners){
+  const center=V3.sub(corner,V3.mul(n.reduce((a,b)=>V3.add(a,b),[0,0,0]),r)),steps=12;
+  for(let i=1;i<steps;i++)for(let j=1;j<steps-i;j++){
+   modGeometryCheck();const k=steps-i-j;
+   const normal=V3.norm(V3.add(V3.add(V3.mul(n[0],i),V3.mul(n[1],j)),V3.mul(n[2],k))),w=V3.dot(normal,center)+r;
+   if(!polys.some(f=>f.some(p=>V3.dot(normal,p)>w+1e-6)))continue;
+   const out=[],segments=[];
+   for(const poly of polys){const d=poly.map(p=>{const x=V3.dot(normal,p)-w;return Math.abs(x)<1e-6?0:x;}),face=[],cross=[];
+    for(let a=0;a<poly.length;a++){const b=(a+1)%poly.length;
+     if(d[a]<=0)face.push(poly[a]);
+     if((d[a]>0)!==(d[b]>0)){const t=clamp(d[a]/(d[a]-d[b]),0,1),p=poly[a].map((v,c)=>v+(poly[b][c]-v)*t);face.push(p);if(!cross.some(q=>V3.len(V3.sub(p,q))<1e-6))cross.push(p);}
+    }
+    if(face.length>=3&&V3.len(polyNormal(face))>1e-10)out.push(face);
+    if(cross.length===2)segments.push(cross);else if(cross.length>2)return s;
+   }
+   const cap=edgeCutBoundary(segments,normal);if(!cap)return s;
+   // A patch must stay at this corner; never cut remote geometry or a hole.
+   if(cap.some(p=>n.some((a,c)=>{const d=V3.dot(a,V3.sub(corner,p));return d< -1e-4||d>r*1.1+1e-4;})))return s;
+   out.push(cap);polys=out;changed=true;
+  }
+ }
+ if(!changed)return s;
+ const result=buildMesh(polys),before=solidVolumeQuick(s),after=solidVolumeQuick(result),allowance=corners.reduce((a,c)=>a+2*c.r**3,0);
+ if(solidBadEdges(result)!==0||after<=0||after>=before||before-after>allowance)return s;
+ return result;
+}
+
 function filletSurgery(solid,chain,size,type){
+ const r=filletSurgeryRaw(solid,chain,size,type);
+ return r&&type==='fillet'&&chain?.straight&&chain.convex?blendRoundedCorners(r):r;
+}
+function filletSurgeryRaw(solid,chain,size,type){
  const quick=convexEdgeSurgery(solid,chain,size,type);if(quick)return quick;
  if(chain&&chain.straight&&!chain.closed&&chain.convex){let r=null;try{r=straightSurgery(solid,chain,size,type);}catch(e){r=null;}if(r)return r;}
  if(!chain||!chain.closed||!chain.convex||chain.straight||!chain.nBe)return null;
@@ -3207,6 +3276,11 @@ function projectApply(d){
  projectLeaveModes();try{ctxClear();}catch(e){}
  sketchShapes.splice(0,sketchShapes.length,...(d.shapes||[]));
  extrudeSolids.splice(0,extrudeSolids.length,...(d.solids||[]));
+ let repairedCorners=0;
+ for(let i=0;i<extrudeSolids.length;i++){
+  const s=extrudeSolids[i];if(!s.faces||!s.adj||!s.feat||!s.feat.some(f=>f.some(Boolean)))continue;
+  try{const r=withModBudget(()=>blendRoundedCorners(s),700);if(r!==s){extrudeSolids[i]=r;repairedCorners++;}}catch(err){/* A complex legacy model stays unchanged if repair is not safe. */}
+ }
  for(const k of Object.keys(customFrames))delete customFrames[k];Object.assign(customFrames,d.frames||{});
  frameCounter=d.frameCounter||0;
  for(const k of Object.keys(faceOutward))delete faceOutward[k];Object.assign(faceOutward,d.faceOutward||{});
@@ -3216,6 +3290,7 @@ function projectApply(d){
  // Loading a project establishes a new undo baseline immediately.
  SKH.sig=JSON.stringify(sketchShapes);SKH.len=0;SKH.redo=0;syncHistButtons();
  draw();
+ return repairedCorners;
 }
 function projectBlank(){return {shapes:[],solids:[],frames:{},frameCounter:0,faceOutward:{}};}
 function newProject(){
@@ -3279,7 +3354,7 @@ fileInput.addEventListener('change',()=>{
   let d;try{d=JSON.parse(String(r.result));}catch(err){flashNotice('Nie można odczytać pliku — to nie jest poprawny projekt RCCAD.',4200);return;}
   if(!d||d.app!=='RCCAD'||!Array.isArray(d.shapes)||!Array.isArray(d.solids)){flashNotice('Ten plik nie jest projektem RCCAD.',4200);return;}
   if((sketchShapes.length||extrudeSolids.length)&&!window.confirm('Otworzyć projekt „'+f.name+'"? Niezapisane zmiany w bieżącym projekcie zostaną utracone.'))return;
-  projectApply(d);projectName=cleanName(d.name||f.name);projectHandle=null;flashNotice('Otwarto projekt: '+f.name,3200);
+  const repaired=projectApply(d);projectName=cleanName(d.name||f.name);projectHandle=null;flashNotice('Otwarto projekt: '+f.name+(repaired?' — wygładzono narożniki zaokrągleń.':''),repaired?5200:3200);
  };
  r.readAsText(f);
 });
