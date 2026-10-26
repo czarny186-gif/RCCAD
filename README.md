@@ -1,5 +1,20 @@
 # RCCAD
 
+## RCCAD Desktop — nowy program Windows EXE
+
+Natywna aplikacja Qt z silnikiem bryłowym OpenCascade. Kod i instrukcje:
+[native/README.md](native/README.md).
+
+**[Pobierz wydanie Windows z Releases](https://github.com/czarny186-gif/RCCAD/releases)**
+
+Rozpakuj całą paczkę i uruchom `RCCAD Desktop.exe`. Pierwsza wersja rozwojowa
+obejmuje podstawowe modelowanie 3D, szkice z wymiarów, otwory, zaokrąglenia,
+operacje Boolean, projekty i import/eksport. Pełna lista oraz ograniczenia
+znajdują się w instrukcji wersji desktopowej. Budowanie i uruchomienie gotowego
+EXE weryfikuje [workflow Windows](.github/workflows/native-windows.yml).
+
+## Dotychczasowy program HTML
+
 Samodzielna aplikacja CAD w pliku `RCCAD.html`.
 Nie wymaga npm ani kompilacji. Z katalogu repozytorium uruchom:
 
