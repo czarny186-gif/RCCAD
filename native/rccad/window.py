@@ -114,6 +114,7 @@ def values_dialog(parent, title, fields, hint=""):
 
 
 class MainWindow(QMainWindow):
+    documentChanged = Signal()
     def __init__(self):
         super().__init__()
         self.document = Document()
@@ -141,6 +142,22 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Gotowy · mm · lewy przycisk: obrót / wybór · środkowy: przesuwanie · rolka: zoom")
         self._style()
         self.refresh()
+        from .studio import Studio
+        # Keep the existing menu actions and CAD commands; replace only their presentation.
+        self.takeCentralWidget()
+        self.studio = Studio(self)
+        self.setCentralWidget(self.studio)
+        for toolbar in self.findChildren(QToolBar):toolbar.hide()
+        self.model_dock.hide()
+        self.setStyleSheet(self.styleSheet()+"""
+        QFrame#floatingCard { background: #ffffff; border: 1px solid #b8cde0; border-radius: 13px; }
+        QFrame#floatingCard QToolButton { background: white; border: 1px solid #cbd9e6; border-radius: 11px; padding: 4px; }
+        QFrame#floatingCard QToolButton:checked { color: white; background: #111; border: 2px solid #111; }
+        QFrame#floatingCard QToolButton:hover { background: #eef8ff; border-color: #2087d6; }
+        QScrollArea, QScrollArea QWidget { background: white; }
+        QLabel#panelTitle { color: #294b67; font-weight: 700; padding-bottom: 8px; }
+        QLabel#workspaceHint { color: #526e89; background: rgba(255,255,255,220); border-radius: 7px; padding: 7px; }
+        """)
 
     def _action(self, name, callback, shortcut=None, icon=None):
         action = QAction(name, self)
@@ -367,10 +384,13 @@ class MainWindow(QMainWindow):
         else:
             self.properties.setText("Dodaj bryłę lub szkic.\nWybierz obiekt w drzewie albo w widoku 3D.")
 
+        self.documentChanged.emit()
+
     def run_operation(self, label, function, apply, fit=False):
         if self.busy:
             return
         self.busy = True
+        self.documentChanged.emit()
         self.progress.show()
         self.statusBar().showMessage(label + "…")
         for action in self.actions:
@@ -473,6 +493,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage('Kliknij krawędź. Aby dodać kolejne, włącz „Wybieraj wiele”. Następnie Zastosuj.')
 
     def end_blend(self):
+        if hasattr(self,'studio') and self.studio.mode=='blend':self.studio.close_tool();return
         self.view.edge_mode=False;self.edges.clear();self.blend_panel.hide();self.refresh()
 
     def apply_blend(self):
@@ -594,7 +615,9 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self,event):
         if event.key()==Qt.Key_Escape and not self.busy:
-            self.end_blend();event.accept();return
+            if hasattr(self,'studio'):self.studio.cancel_points()
+            else:self.end_blend()
+            event.accept();return
         super().keyPressEvent(event)
 
     def closeEvent(self,event):

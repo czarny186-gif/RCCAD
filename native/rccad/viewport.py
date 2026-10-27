@@ -10,6 +10,13 @@ from .document import Body
 
 
 class CadView(gl.GLViewWidget):
+    sketchClicked = Signal(float, float)
+    sketchMoved = Signal(float, float)
+    faceClicked = Signal(str, object)
+    profileClicked = Signal(str)
+    handleDragged = Signal(str, float)
+    editCancelled = Signal()
+    profileClosed = Signal()
     edgeClicked = Signal(str, int, bool)
     bodyClicked = Signal(str, bool)
     selectionCleared = Signal()
@@ -49,6 +56,15 @@ class CadView(gl.GLViewWidget):
         self.multi_select = False
         self._drag_position = None
         self._press = None
+        self.sketch_mode = False
+        self.face_mode = False
+        self.profile_mode = False
+        self.preview_items = []
+        self.preview_replacement = None
+        self.handle_items = []
+        self.handle = None
+        self.drag_handle = None
+
 
     def set_models(self, bodies, selected_bodies=(), selected_edges=None):
         for item in self.model_items + self.highlight_items:
@@ -60,16 +76,20 @@ class CadView(gl.GLViewWidget):
         for body in self.bodies:
             if not body.visible or body.mesh is None:
                 continue
-            mesh = body.mesh
+            replacement=self.preview_replacement is not None and self.preview_replacement[0]==body.id
+            mesh = self.preview_replacement[1] if replacement else body.mesh
             color = (.30, .53, .76, 1) if body.id in self.selected_bodies else (.64, .67, .72, 1)
+            if replacement:color=(.28,.74,.55,1)
             if len(mesh.triangles):
                 item = gl.GLMeshItem(vertexes=mesh.vertices, faces=mesh.triangles, smooth=True, color=color, shader='rccad', drawEdges=False)
                 item.setGLOptions('opaque')
+                from OpenGL import GL
+                item.updateGLOptions({GL.GL_POLYGON_OFFSET_FILL: True, 'glPolygonOffset': (1., 1.)})
                 self.addItem(item)
                 self.model_items.append(item)
             for index, points in mesh.edges.items():
-                selected = index in self.selected_edges.get(body.id, set())
-                line = gl.GLLinePlotItem(pos=points, color=(1, .48, .05, 1) if selected else (.12, .16, .21, 1), width=3 if selected else 1, antialias=True)
+                selected = not replacement and index in self.selected_edges.get(body.id, set())
+                line = gl.GLLinePlotItem(pos=points, color=(1, .48, .05, 1) if selected else (.12, .16, .21, 1), width=3 if selected else 1, antialias=True, glOptions='opaque')
                 self.addItem(line)
                 self.model_items.append(line)
         self.update()
@@ -87,7 +107,7 @@ class CadView(gl.GLViewWidget):
         self.setCameraPosition(distance=max(20, float(np.linalg.norm(high - low)) * 1.6))
 
     def set_view(self, name):
-        values = {'iso': (25, -55), 'XY': (90, -90), 'XZ': (0, -90), 'YZ': (0, 0)}
+        values = {'iso': (25, -55), 'XY': (90, -90), '-XY': (-90, -90), 'XZ': (0, -90), '-XZ': (0, 90), 'YZ': (0, 0), '-YZ': (0, 180)}
         el, az = values[name]
         self.setCameraPosition(elevation=el, azimuth=az)
 
@@ -174,7 +194,101 @@ class CadView(gl.GLViewWidget):
         hit = self._hit(origin, direction)
         return hit is None or hit[0] >= np.linalg.norm(point-origin)-.25
 
+    def set_sketch_plane(self,frame):
+        from PySide6.QtGui import QMatrix4x4
+        from .interaction import plane_from
+        if frame is None:self.grid_item.resetTransform();return
+        p=plane_from(frame);x=p.xDir.toTuple();y=p.yDir.toTuple();z=p.zDir.toTuple();o=p.origin.toTuple()
+        matrix=QMatrix4x4(x[0],y[0],z[0],o[0],x[1],y[1],z[1],o[1],x[2],y[2],z[2],o[2],0,0,0,1)
+        self.grid_item.setTransform(matrix)
+
+    def show_blend_preview(self,identifier,mesh):
+        self.clear_preview();self.preview_replacement=(identifier,mesh)
+        self.set_models(self.bodies,self.selected_bodies,self.selected_edges)
+
+    def clear_preview(self):
+        if self.preview_replacement is not None:
+            self.preview_replacement=None;self.set_models(self.bodies,self.selected_bodies,self.selected_edges)
+        for item in self.preview_items:self.removeItem(item)
+        self.preview_items=[]
+        self.update()
+
+    def show_lines(self, points, color):
+        self.clear_preview()
+        item=gl.GLLinePlotItem(pos=points,color=pg.mkColor(color),width=3,antialias=True)
+        self.addItem(item);self.preview_items.append(item)
+
+    def show_wire(self,wire,color):
+        self.clear_preview()
+        for edge in wire.Edges():
+            points=np.asarray([p.toTuple() for p in edge.positions(np.linspace(0,1,2 if edge.geomType()=='LINE' else 72))])
+            item=gl.GLLinePlotItem(pos=points,color=pg.mkColor(color),width=3,antialias=True)
+            self.addItem(item);self.preview_items.append(item)
+
+    def show_preview_mesh(self,mesh,color):
+        self.clear_preview()
+        col=pg.mkColor(color);col.setAlphaF(.42)
+        item=gl.GLMeshItem(vertexes=mesh.vertices,faces=mesh.triangles,smooth=True,color=col,shader='rccad',drawEdges=False)
+        item.setGLOptions('translucent');self.addItem(item);self.preview_items.append(item)
+        for points in mesh.edges.values():
+            edge=gl.GLLinePlotItem(pos=points,color=pg.mkColor(color),width=2,antialias=True)
+            self.addItem(edge);self.preview_items.append(edge)
+
+    def set_handle(self,point,normal=None,kind=None):
+        for item in self.handle_items:self.removeItem(item)
+        self.handle_items=[]
+        self.handle=None if point is None else (np.array(point,dtype=float),np.array(normal,dtype=float),kind)
+        if self.handle:
+            point,normal,kind=self.handle
+            # Fixed 3D arrow; screen picking uses its projected tip.
+            length=max(3,self.opts['distance']*.045)
+            points=np.array([point-normal*length,point])
+            line=gl.GLLinePlotItem(pos=points,color=(1,.58,.08,1),width=5,antialias=True)
+            dot=gl.GLScatterPlotItem(pos=point.reshape(1,3),color=(1,.58,.08,1),size=24,pxMode=True)
+            for item in [line,dot]:
+                item.setGLOptions('translucent');self.addItem(item);self.handle_items.append(item)
+        self.update()
+
+    def pick_profile(self,x,y):
+        import cadquery as cq
+        from .interaction import plane_point, frame_for
+        ray=self._ray(x,y)
+        if ray is None:return None
+        solid=self._hit(*ray);best=None
+        for body in self.bodies:
+            if not body.visible or body.kind!='sketch':continue
+            try:
+                frame=body.frame or frame_for(body.plane)
+                q=plane_point(frame,*ray)
+                if q is None:continue
+                from .interaction import world_point
+                point=world_point(frame,q)
+                depth=np.linalg.norm(np.array(point)-ray[0])
+                if solid and solid[0]<depth-.3:continue
+                if body.shape.IsClosed():
+                    face=cq.Face.makeFromWires(body.shape)
+                    inside=face.distance(cq.Vertex.makeVertex(*point))<.1
+                else:inside=False
+                if inside and (best is None or depth<best[0]-1e-4 or (abs(depth-best[0])<1e-4 and face.Area()<best[2])):best=(depth,body.id,face.Area())
+            except (ValueError,RuntimeError):continue
+        if best:return best[1]
+        hit=self.nearest_edge(x,y)
+        if hit and any(b.id==hit[0] and b.kind=='sketch' for b in self.bodies):return hit[0]
+        return None
+
     def mouseMoveEvent(self, event):
+        if self.drag_handle is not None:
+            point,normal,kind,last=self.drag_handle
+            current=event.position()
+            xy,_,_=self.project_points(np.array([point,point+normal]))
+            vector=xy[1]-xy[0];denom=float(vector@vector)
+            delta=np.array([current.x()-last.x(),current.y()-last.y()])
+            amount=float(delta@vector/denom) if denom>.04 else -float(delta[1])*self.opts['distance']/max(1,self.height())
+            self.drag_handle=(point+normal*amount,normal,kind,current)
+            self.handleDragged.emit(kind,amount);event.accept();return
+        if self.sketch_mode and self.mouse_mode=='select':
+            self.sketchMoved.emit(event.position().x(),event.position().y())
+            event.accept();return
         if self._press and self._press[2] == Qt.LeftButton and self.mouse_mode in ('orbit', 'pan'):
             pos = event.position()
             previous = self._drag_position or pos
@@ -191,27 +305,44 @@ class CadView(gl.GLViewWidget):
     def mousePressEvent(self, event):
         self._drag_position = event.position()
         self._press = (event.position().x(), event.position().y(), event.button())
+        if self.handle is not None and event.button()==Qt.LeftButton:
+            point,normal,kind=self.handle
+            xy,_,_=self.project_points(point.reshape(1,3))
+            if np.linalg.norm(xy[0]-[event.position().x(),event.position().y()])<18:
+                self.drag_handle=(point,normal,kind,event.position());event.accept();return
+        if (self.sketch_mode or self.face_mode) and self.mouse_mode=='select':event.accept();return
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self.drag_handle is not None:
+            self.drag_handle=None;self._press=None;event.accept();return
         super().mouseReleaseEvent(event)
-        if not self._press:
+        if not self._press:return
+        x,y,button=self._press;self._press=None
+        if self.mouse_mode!='select' or button!=Qt.LeftButton or np.hypot(event.position().x()-x,event.position().y()-y)>4:return
+        if self.sketch_mode:self.sketchClicked.emit(x,y);return
+        if self.face_mode:
+            ray=self._ray(x,y);hit=self._hit(*ray) if ray else None
+            if hit:self.faceClicked.emit(hit[1],tuple(ray[0]+ray[1]*hit[0]))
             return
-        x, y, button = self._press
-        self._press = None
-        if self.mouse_mode != "select" or button != Qt.LeftButton or np.hypot(event.position().x()-x, event.position().y()-y)>4:
-            return
-        additive = self.multi_select or bool(event.modifiers() & Qt.ShiftModifier)
+        additive=self.multi_select or bool(event.modifiers() & Qt.ShiftModifier)
         if self.edge_mode:
-            hit = self.nearest_edge(x,y)
-            if hit:
-                self.edgeClicked.emit(*hit,additive)
-            elif not additive:
-                self.selectionCleared.emit()
+            hit=self.nearest_edge(x,y)
+            if hit:self.edgeClicked.emit(*hit,additive)
+            elif not additive:self.selectionCleared.emit()
         else:
-            ray=self._ray(x,y)
-            hit=self._hit(*ray) if ray else None
-            if hit:
-                self.bodyClicked.emit(hit[1],additive)
-            elif not additive:
-                self.selectionCleared.emit()
+            profile=self.pick_profile(x,y)
+            if profile:
+                if self.profile_mode:self.profileClicked.emit(profile)
+                else:self.bodyClicked.emit(profile,additive)
+                return
+            ray=self._ray(x,y);hit=self._hit(*ray) if ray else None
+            if hit:self.bodyClicked.emit(hit[1],additive)
+            elif not additive:self.selectionCleared.emit()
+
+    def keyPressEvent(self,event):
+        if event.key()==Qt.Key_Escape:
+            self.editCancelled.emit();event.accept();return
+        if event.key() in (Qt.Key_Return,Qt.Key_Enter) and self.sketch_mode:
+            self.profileClosed.emit();event.accept();return
+        super().keyPressEvent(event)

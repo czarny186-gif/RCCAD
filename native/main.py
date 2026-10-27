@@ -27,7 +27,8 @@ def main():
         if sys.stdout is not None:
             print(json.dumps(result,ensure_ascii=False,indent=2))
         return 0
-    from PySide6.QtCore import Qt
+    from PySide6.QtCore import Qt, QCoreApplication
+    QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     from PySide6.QtWidgets import QApplication, QMessageBox
     from PySide6.QtGui import QFont, QSurfaceFormat
     format=QSurfaceFormat();format.setDepthBufferSize(24);format.setSamples(4)

@@ -31,3 +31,32 @@ Windows 10/11 x64 jest platformą docelową. Proces budowania uruchamia aplikacj
 na Windows Server 2025 w trybie testowym bez rzeczywistego okna GPU; nie zastępuje
 to testów sterownika graficznego na komputerze użytkownika. Wydanie 0.1 jest
 wersją rozwojową, a nie pełną implementacją funkcji starszego programu HTML.
+
+
+## Wersja 0.3 — interfejs w stylu HTML (27.10.2026)
+
+Moduł `native/rccad/kernel.py` jest identyczny jak w poprzednim EXE 0.2.
+Nowa warstwa interakcji tworzy dokładne krzywe CAD i przekazuje operacje do
+OpenCascade. Nie przeniesiono silnika geometrii ani obliczeń na siatkach z HTML.
+Przeniesiono oryginalne ikony, układ pływających paneli, kostkę widoków i gesty.
+
+Weryfikacja przed wydaniem:
+
+- 48/48 testów jednostkowych/integracyjnych: dokładne profile i wyciągnięcia,
+  łączenie wyciągnięć i otwory z sześciu stron, szkic na obróconej ścianie,
+  profile wewnętrzne, zapis płaszczyzn, mysz/Qt, anulowanie i cofanie.
+- 8/8 prób w rzeczywistym oknie Qt/OpenGL na Xvfb/Mesa: rysowanie figur,
+  szkic na ścianie, wycięcie i undo/redo, uchwyty wyciągnięcia, przesunięcia
+  i rozmiaru krawędzi, zastosowanie fazy/zaokrąglenia, anulowanie podglądu.
+- Rzeczywiste renderowanie bez błędów OpenGL. Przy wielu oknach testowych
+  włączono współdzielenie kontekstów Qt, zgodnie z globalną pamięcią shaderów pyqtgraph.
+- Zwykły i rozszerzony test gotowości aplikacji: poprawny wynik; test gotowego
+  EXE pozostaje obowiązkowym etapem Windows workflow przed publikacją paczki.
+
+Podglądy działają w wątku roboczym. Spóźnione wyniki są odrzucane według generacji
+narzędzia i rewizji dokumentu. Dopiero Zastosuj tworzy transakcję geometrii;
+zużyte profile są ukrywane w tej samej transakcji, z poprawnym undo/redo.
+
+Przykładowe zrzuty: [szkic](native/docs/szkic.png), [krawędzie](native/docs/krawedzie.png).
+Nie deklarujemy pełnej zgodności narzędzi z HTML: tekst/SVG, zaawansowana edycja
+istniejących figur i więzy parametryczne nie zostały przeniesione.

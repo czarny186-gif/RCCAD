@@ -22,6 +22,9 @@ class Body:
     visible: bool = True
     mesh: DisplayMesh | None = field(default=None, compare=False, repr=False)
 
+    frame: tuple | None = None
+    support_id: str | None = None
+
     def prepared(self):
         return replace(self, mesh=display_mesh(self.shape))
 
@@ -88,7 +91,7 @@ class Document:
                     cq.exporters.export(body.shape, str(source), exportType="BREP")
                     member = f"bodies/{body.id}.brep"
                     archive.write(source, member)
-                    manifest['bodies'].append(dict(id=body.id, name=body.name, kind=body.kind, plane=body.plane, visible=body.visible, file=member))
+                    manifest['bodies'].append(dict(id=body.id, name=body.name, kind=body.kind, plane=body.plane, visible=body.visible, file=member, frame=body.frame, support_id=body.support_id))
                 archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
             os.replace(temp_path, path)
             self.path = path
@@ -124,7 +127,12 @@ class Document:
                     source.write_bytes(archive.read(item['file']))
                     shape = cq.importers.importBrep(str(source)).val()
                     valid(shape, kind == 'solid')
-                    bodies.append(Body(str(item['name']), shape, kind, plane, identifier, bool(item.get('visible', True))).prepared())
+                    from .interaction import checked_frame
+                    frame = checked_frame(item['frame']) if item.get('frame') is not None else None
+                    support = item.get('support_id')
+                    if support is not None and not re.fullmatch('[0-9a-f]{32}', str(support)):
+                        raise CadError("Nieprawidłowe powiązanie szkicu.")
+                    bodies.append(Body(str(item['name']), shape, kind, plane, identifier, bool(item.get('visible', True)), frame=frame, support_id=support).prepared())
                 result.bodies = tuple(bodies)
                 result.path = Path(path)
                 return result

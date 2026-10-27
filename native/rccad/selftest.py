@@ -24,6 +24,16 @@ def run(report_path=None):
     wire = k.sketch('rectangle','XY',20,10)
     assert abs(k.extrude(wire,'XY',10).Volume()-2000) < 1e-5
     checks.append('native sketch extrusion')
+    from . import interaction as g
+    frame=g.frame_for('XY',30)
+    profile=Body('Na ścianie',g.profile('rectangle',frame,[(5,5),(25,25)]),'sketch',frame=frame)
+    joined=g.apply_profile(profile,10,'union',Body('Baza',shape))
+    assert abs(joined.Volume()-31000)<1e-5
+    top=g.frame_for('XY',40)
+    cutter=Body('Otwór',g.profile('circle',top,[(15,15),(18,15)]),'sketch',frame=top)
+    cut=g.apply_profile(cutter,60,'subtract',Body('Połączona',joined))
+    assert cut.isValid() and cut.Volume()<joined.Volume()
+    checks.append('graphical profiles, face placement, joined extrusion and profile cut')
     doc=Document();body=Body('Zaokrąglona kostka',rounded).prepared();doc.commit([body])
     doc.undo();assert not doc.bodies;doc.redo();assert len(doc.bodies)==1
     with tempfile.TemporaryDirectory(prefix='rccad-check-') as directory:
@@ -46,6 +56,8 @@ def run(report_path=None):
     window.view.resize(800,600);window.view.fit_all()
     projected,_,_=window.view.project_points(body.mesh.vertices[:3])
     assert window.view._ray(float(projected[0][0]),float(projected[0][1])) is not None
+    assert all(not window.studio.buttons[key].icon().isNull() for key in ['sketch','extrude','boolean','blend','mirror'])
+    checks.append('bundled HTML pictograms and native graphical workspace')
     checks.append('Qt coordinate projection and picking ray')
     window.document._saved_revision=window.document._revision
     window.close();app.processEvents()

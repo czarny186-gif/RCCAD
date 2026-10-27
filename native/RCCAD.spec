@@ -4,7 +4,7 @@ import sys
 from PyInstaller.utils.hooks import collect_submodules, collect_data_files, collect_dynamic_libs, collect_delvewheel_libs_directory, copy_metadata
 
 root = Path(SPECPATH)
-datas = collect_data_files('cadquery')
+datas = collect_data_files('cadquery') + [(str(root/'rccad'/'assets'), 'rccad/assets')]
 for package in ['cadquery','cadquery-ocp','PySide6-Essentials','shiboken6','numpy','pyqtgraph','PyOpenGL','vtk']:
     datas += copy_metadata(package, recursive=True)
 binaries = collect_dynamic_libs('OCP')
