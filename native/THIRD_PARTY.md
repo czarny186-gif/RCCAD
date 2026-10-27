@@ -20,3 +20,10 @@ Zachowaj informacje licencyjne bibliotek dołączone w pakiecie. Użytkownik mo�
 wymieniać dynamiczne biblioteki zgodnie z warunkami odpowiedniej licencji.
 Kod aplikacji, konfiguracja budowania oraz dokładne wersje zależności są dostępne
 w tym repozytorium. Ten wykaz nie zastępuje pełnych tekstów licencji komponentów.
+
+
+### DejaVu
+
+Dołączono DejaVu Sans, DejaVu Sans Bold i DejaVu Serif do konturów tekstu CAD.
+Pochodzą z pakietu fonts-dejavu-core; pełny tekst licencji i noty autorów są
+w `rccad/assets/fonts/LICENSE.txt` (w paczce: `_internal/rccad/assets/fonts/LICENSE.txt`).

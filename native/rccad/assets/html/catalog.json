@@ -1,0 +1,806 @@
+{
+  "source": "RCCAD.html",
+  "source_sha256": "b3a41e854e7d02d7c10a2219bb29e4f02056ac8b51f96e91397ab451cc534577",
+  "images": [
+    {
+      "file": "image_00.png",
+      "sha256": "d3085b002d433fc2cb71837f5720a40cb160fc31ef0e36b3014160bcdc8ab044",
+      "format": "png"
+    },
+    {
+      "file": "image_01.png",
+      "sha256": "682aa400d3dd26969949b0e161e7b4dfa9a00c262672888354427f52cc5a5dfd",
+      "format": "png"
+    },
+    {
+      "file": "image_02.png",
+      "sha256": "992d551f7f160b49b250f92c864fa34c5874b2f029c47c16b406bac0e128df65",
+      "format": "png"
+    },
+    {
+      "file": "image_03.png",
+      "sha256": "9c09df6664e3fb30c80d12f2c6a34ebf48156adbca8db6d427a5d583a2961054",
+      "format": "png"
+    },
+    {
+      "file": "image_04.png",
+      "sha256": "2812b4e66fda334e97bb698519c696cc91581b2199af9d3673127297469d4a17",
+      "format": "png"
+    },
+    {
+      "file": "image_05.png",
+      "sha256": "20f4f4b1c2184b905d12ed4fc4fa054894de655a69c415468d347ca5dfed63cd",
+      "format": "png"
+    }
+  ],
+  "buttons": {
+    "undoBtn": {
+      "title": "Cofnij (Ctrl+Z)",
+      "source_attributes": {
+        "id": "undoBtn",
+        "type": "button",
+        "title": "Cofnij (Ctrl+Z)",
+        "aria-label": "Cofnij"
+      },
+      "file": "undoBtn.svg"
+    },
+    "redoBtn": {
+      "title": "Ponów (Ctrl+Y)",
+      "source_attributes": {
+        "id": "redoBtn",
+        "type": "button",
+        "title": "Ponów (Ctrl+Y)",
+        "aria-label": "Ponów"
+      },
+      "file": "redoBtn.svg"
+    },
+    "moveTool": {
+      "title": "Przesuń zaznaczony element w osiach X, Y, Z",
+      "source_attributes": {
+        "id": "moveTool",
+        "title": "Przesuń zaznaczony element w osiach X, Y, Z"
+      },
+      "glyph": "✥"
+    },
+    "rotateTool": {
+      "title": "Obróć zaznaczony element",
+      "source_attributes": {
+        "id": "rotateTool",
+        "title": "Obróć zaznaczony element"
+      },
+      "glyph": "⟳"
+    },
+    "fileTool": {
+      "title": "Projekt — nowy, zapisz, otwórz (Ctrl+S: zapisz)",
+      "source_attributes": {
+        "id": "fileTool",
+        "title": "Projekt — nowy, zapisz, otwórz (Ctrl+S: zapisz)",
+        "aria-label": "Projekt",
+        "aria-pressed": "false"
+      },
+      "file": "fileTool.svg"
+    },
+    "newSketch": {
+      "title": "Nowy szkic — wybierz płaszczyznę (Esc: zakończ)",
+      "source_attributes": {
+        "id": "newSketch",
+        "title": "Nowy szkic — wybierz płaszczyznę (Esc: zakończ)",
+        "aria-label": "Nowy szkic",
+        "aria-pressed": "false"
+      },
+      "file": "newSketch.png"
+    },
+    "extrudeTool": {
+      "title": "Extrude — wyłącz szkic i przejdź do trybu wyciągania",
+      "source_attributes": {
+        "id": "extrudeTool",
+        "title": "Extrude — wyłącz szkic i przejdź do trybu wyciągania",
+        "aria-label": "Extrude",
+        "aria-pressed": "false"
+      },
+      "file": "extrudeTool.png"
+    },
+    "boolTool": {
+      "title": "Boolean / CSG — suma, różnica i część wspólna brył",
+      "source_attributes": {
+        "id": "boolTool",
+        "title": "Boolean / CSG — suma, różnica i część wspólna brył",
+        "aria-label": "Boolean",
+        "aria-pressed": "false"
+      },
+      "file": "boolTool.png"
+    },
+    "modTool": {
+      "title": "Zaokrąglanie i fazowanie krawędzi",
+      "source_attributes": {
+        "id": "modTool",
+        "title": "Zaokrąglanie i fazowanie krawędzi",
+        "aria-label": "Edytuj bryłę",
+        "aria-pressed": "false"
+      },
+      "file": "modTool.png"
+    },
+    "mirrorTool": {
+      "title": "Odbicie lustrzane — bryły i szkice",
+      "source_attributes": {
+        "id": "mirrorTool",
+        "title": "Odbicie lustrzane — bryły i szkice",
+        "aria-label": "Odbicie lustrzane",
+        "aria-pressed": "false"
+      },
+      "file": "mirrorTool.png"
+    },
+    "line": {
+      "title": "Linia — kliknij dwa punkty",
+      "source_attributes": {
+        "data-shape": "line",
+        "title": "Linia — kliknij dwa punkty",
+        "aria-label": "Linia"
+      },
+      "file": "line.svg"
+    },
+    "rect": {
+      "title": "Prostokąt — wybierz wariant strzałką",
+      "source_attributes": {
+        "data-shape": "rect",
+        "title": "Prostokąt — wybierz wariant strzałką",
+        "aria-label": "Prostokąt"
+      },
+      "file": "rect.svg"
+    },
+    "circle": {
+      "title": "Okrąg — wybierz wariant strzałką",
+      "source_attributes": {
+        "data-shape": "circle",
+        "title": "Okrąg — wybierz wariant strzałką",
+        "aria-label": "Okrąg"
+      },
+      "file": "circle.svg"
+    },
+    "text": {
+      "title": "Tekst — wpisz treść w panelu i kliknij miejsce na szkicu",
+      "source_attributes": {
+        "data-shape": "text",
+        "title": "Tekst — wpisz treść w panelu i kliknij miejsce na szkicu",
+        "aria-label": "Tekst"
+      },
+      "file": "text.svg"
+    },
+    "ellipse": {
+      "title": "Elipsa",
+      "source_attributes": {
+        "data-shape": "ellipse",
+        "title": "Elipsa",
+        "aria-label": "Elipsa"
+      },
+      "file": "ellipse.svg"
+    },
+    "slot": {
+      "title": "Fasolka / szczelina",
+      "source_attributes": {
+        "data-shape": "slot",
+        "title": "Fasolka / szczelina",
+        "aria-label": "Fasolka / szczelina"
+      },
+      "file": "slot.svg"
+    },
+    "polygon": {
+      "title": "Wielokąt (5 boków)",
+      "source_attributes": {
+        "data-shape": "polygon",
+        "title": "Wielokąt (5 boków)",
+        "aria-label": "Wielokąt (5 boków)"
+      },
+      "file": "polygon.svg"
+    },
+    "arc": {
+      "title": "Łuk 3-punktowy",
+      "source_attributes": {
+        "data-shape": "arc",
+        "title": "Łuk 3-punktowy",
+        "aria-label": "Łuk 3-punktowy"
+      },
+      "file": "arc.svg"
+    },
+    "point": {
+      "title": "Punkt",
+      "source_attributes": {
+        "data-shape": "point",
+        "title": "Punkt",
+        "aria-label": "Punkt"
+      },
+      "file": "point.svg"
+    },
+    "construction": {
+      "title": "Linia konstrukcyjna",
+      "source_attributes": {
+        "data-shape": "construction",
+        "title": "Linia konstrukcyjna",
+        "aria-label": "Linia konstrukcyjna"
+      },
+      "file": "construction.svg"
+    },
+    "measure": {
+      "title": "Wymiar szkicu — wybierz geometrię, a następnie położenie wymiaru",
+      "source_attributes": {
+        "data-shape": "measure",
+        "title": "Wymiar szkicu — wybierz geometrię, a następnie położenie wymiaru",
+        "aria-label": "Wymiar szkicu"
+      },
+      "file": "measure.svg"
+    },
+    "trim": {
+      "title": "Nożyczki — usuń fragment pomiędzy punktami przecięcia",
+      "source_attributes": {
+        "data-shape": "trim",
+        "title": "Nożyczki — usuń fragment pomiędzy punktami przecięcia",
+        "aria-label": "Przytnij między przecięciami"
+      },
+      "file": "trim.svg"
+    },
+    "planesToggle": {
+      "title": "Pokaż / ukryj płaszczyzny",
+      "source_attributes": {
+        "id": "planesToggle",
+        "aria-label": "Pokaż lub ukryj płaszczyzny",
+        "aria-pressed": "true",
+        "title": "Pokaż / ukryj płaszczyzny"
+      },
+      "file": "planesToggle.png"
+    },
+    "home": {
+      "title": "Widok startowy (XY, izometria)",
+      "source_attributes": {
+        "id": "home",
+        "title": "Widok startowy (XY, izometria)",
+        "aria-label": "Przywróć widok startowy"
+      },
+      "glyph": "⌂"
+    }
+  },
+  "controls": [
+    {
+      "attributes": {
+        "id": "boolApply",
+        "type": "button"
+      },
+      "text": "Zastosuj"
+    },
+    {
+      "attributes": {
+        "id": "boolCancel",
+        "type": "button"
+      },
+      "text": "Anuluj"
+    },
+    {
+      "attributes": {
+        "id": "modApply",
+        "type": "button"
+      },
+      "text": "Zastosuj"
+    },
+    {
+      "attributes": {
+        "id": "modCancel",
+        "type": "button"
+      },
+      "text": "Zamknij"
+    },
+    {
+      "attributes": {
+        "id": "undoBtn",
+        "type": "button",
+        "title": "Cofnij (Ctrl+Z)",
+        "aria-label": "Cofnij"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "redoBtn",
+        "type": "button",
+        "title": "Ponów (Ctrl+Y)",
+        "aria-label": "Ponów"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "fileNew",
+        "type": "button"
+      },
+      "text": "Nowy projekt"
+    },
+    {
+      "attributes": {
+        "id": "fileSave",
+        "type": "button"
+      },
+      "text": "Zapisz projekt Ctrl+S"
+    },
+    {
+      "attributes": {
+        "id": "fileSaveAs",
+        "type": "button"
+      },
+      "text": "Zapisz jako…"
+    },
+    {
+      "attributes": {
+        "id": "fileOpen",
+        "type": "button"
+      },
+      "text": "Otwórz projekt…"
+    },
+    {
+      "attributes": {
+        "id": "fileImport",
+        "type": "button"
+      },
+      "text": "Importuj… STEP STL DXF SVG"
+    },
+    {
+      "attributes": {
+        "id": "fileExport",
+        "type": "button"
+      },
+      "text": "Eksportuj… STEP STL"
+    },
+    {
+      "attributes": {
+        "id": "saveOk",
+        "type": "button"
+      },
+      "text": "Zapisz"
+    },
+    {
+      "attributes": {
+        "id": "saveCancel",
+        "type": "button"
+      },
+      "text": "Anuluj"
+    },
+    {
+      "attributes": {
+        "data-act": "copy",
+        "type": "button"
+      },
+      "text": "Kopiuj Ctrl+C"
+    },
+    {
+      "attributes": {
+        "data-act": "cut",
+        "type": "button"
+      },
+      "text": "Wytnij Ctrl+X"
+    },
+    {
+      "attributes": {
+        "data-act": "paste",
+        "type": "button"
+      },
+      "text": "Wklej Ctrl+V"
+    },
+    {
+      "attributes": {
+        "data-act": "delete",
+        "type": "button"
+      },
+      "text": "Usuń Del"
+    },
+    {
+      "attributes": {
+        "id": "mirrorReset",
+        "type": "button"
+      },
+      "text": "Zmień obiekt"
+    },
+    {
+      "attributes": {
+        "id": "mirrorApply",
+        "type": "button"
+      },
+      "text": "Zastosuj"
+    },
+    {
+      "attributes": {
+        "id": "mirrorCancel",
+        "type": "button"
+      },
+      "text": "Zamknij"
+    },
+    {
+      "attributes": {
+        "id": "exportOk",
+        "type": "button"
+      },
+      "text": "Eksportuj"
+    },
+    {
+      "attributes": {
+        "id": "exportCancel",
+        "type": "button"
+      },
+      "text": "Anuluj"
+    },
+    {
+      "attributes": {
+        "id": "importOk",
+        "type": "button",
+        "disabled": null
+      },
+      "text": "Importuj"
+    },
+    {
+      "attributes": {
+        "id": "importCancel",
+        "type": "button"
+      },
+      "text": "Anuluj"
+    },
+    {
+      "attributes": {
+        "id": "textClose",
+        "type": "button"
+      },
+      "text": "Zamknij narzędzie"
+    },
+    {
+      "attributes": {
+        "id": "extrudeApply"
+      },
+      "text": "Zastosuj"
+    },
+    {
+      "attributes": {
+        "id": "extrudeCancel"
+      },
+      "text": "Anuluj"
+    },
+    {
+      "attributes": {
+        "id": "moveTool",
+        "title": "Przesuń zaznaczony element w osiach X, Y, Z"
+      },
+      "text": "✥"
+    },
+    {
+      "attributes": {
+        "id": "rotateTool",
+        "title": "Obróć zaznaczony element"
+      },
+      "text": "⟳"
+    },
+    {
+      "attributes": {
+        "id": "transformApply"
+      },
+      "text": "Zastosuj"
+    },
+    {
+      "attributes": {
+        "id": "transformCancel"
+      },
+      "text": "Anuluj"
+    },
+    {
+      "attributes": {
+        "id": "fileTool",
+        "title": "Projekt — nowy, zapisz, otwórz (Ctrl+S: zapisz)",
+        "aria-label": "Projekt",
+        "aria-pressed": "false"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "newSketch",
+        "title": "Nowy szkic — wybierz płaszczyznę (Esc: zakończ)",
+        "aria-label": "Nowy szkic",
+        "aria-pressed": "false"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "extrudeTool",
+        "title": "Extrude — wyłącz szkic i przejdź do trybu wyciągania",
+        "aria-label": "Extrude",
+        "aria-pressed": "false"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "boolTool",
+        "title": "Boolean / CSG — suma, różnica i część wspólna brył",
+        "aria-label": "Boolean",
+        "aria-pressed": "false"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "modTool",
+        "title": "Zaokrąglanie i fazowanie krawędzi",
+        "aria-label": "Edytuj bryłę",
+        "aria-pressed": "false"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "mirrorTool",
+        "title": "Odbicie lustrzane — bryły i szkice",
+        "aria-label": "Odbicie lustrzane",
+        "aria-pressed": "false"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "line",
+        "title": "Linia — kliknij dwa punkty",
+        "aria-label": "Linia"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "rect",
+        "title": "Prostokąt — wybierz wariant strzałką",
+        "aria-label": "Prostokąt"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "class": "shapeExpand",
+        "type": "button",
+        "title": "Warianty prostokąta",
+        "aria-label": "Warianty prostokąta"
+      },
+      "text": "▾"
+    },
+    {
+      "attributes": {
+        "data-shape": "rect",
+        "title": "Prostokąt z dwóch narożników"
+      },
+      "text": "2 narożniki"
+    },
+    {
+      "attributes": {
+        "data-shape": "centerRect",
+        "title": "Prostokąt od środka — środek i narożnik"
+      },
+      "text": "Od środka"
+    },
+    {
+      "attributes": {
+        "data-shape": "rect3",
+        "title": "Prostokąt 3-punktowy — podstawa i wysokość"
+      },
+      "text": "3 punkty"
+    },
+    {
+      "attributes": {
+        "data-shape": "circle",
+        "title": "Okrąg — wybierz wariant strzałką",
+        "aria-label": "Okrąg"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "class": "shapeExpand",
+        "type": "button",
+        "title": "Warianty okręgu",
+        "aria-label": "Warianty okręgu"
+      },
+      "text": "▾"
+    },
+    {
+      "attributes": {
+        "data-shape": "circle",
+        "title": "Okrąg od środka i promienia"
+      },
+      "text": "Środek + promień"
+    },
+    {
+      "attributes": {
+        "data-shape": "circleTangent2",
+        "title": "Okrąg styczny do dwóch prostych — kliknij dwie linie, następnie wskaż wielkość okręgu"
+      },
+      "text": "Styczny do 2 elementów"
+    },
+    {
+      "attributes": {
+        "data-shape": "circle2",
+        "title": "Okrąg przez dwa końce średnicy"
+      },
+      "text": "Od 2 punktów"
+    },
+    {
+      "attributes": {
+        "data-shape": "circle3",
+        "title": "Okrąg przez trzy punkty"
+      },
+      "text": "Od 3 punktów"
+    },
+    {
+      "attributes": {
+        "data-shape": "text",
+        "title": "Tekst — wpisz treść w panelu i kliknij miejsce na szkicu",
+        "aria-label": "Tekst"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "ellipse",
+        "title": "Elipsa",
+        "aria-label": "Elipsa"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "slot",
+        "title": "Fasolka / szczelina",
+        "aria-label": "Fasolka / szczelina"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "polygon",
+        "title": "Wielokąt (5 boków)",
+        "aria-label": "Wielokąt (5 boków)"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "arc",
+        "title": "Łuk 3-punktowy",
+        "aria-label": "Łuk 3-punktowy"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "point",
+        "title": "Punkt",
+        "aria-label": "Punkt"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "construction",
+        "title": "Linia konstrukcyjna",
+        "aria-label": "Linia konstrukcyjna"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "measure",
+        "title": "Wymiar szkicu — wybierz geometrię, a następnie położenie wymiaru",
+        "aria-label": "Wymiar szkicu"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "data-shape": "trim",
+        "title": "Nożyczki — usuń fragment pomiędzy punktami przecięcia",
+        "aria-label": "Przytnij między przecięciami"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "existingDimApply",
+        "type": "button"
+      },
+      "text": "Zastosuj"
+    },
+    {
+      "attributes": {
+        "id": "existingDimCancel",
+        "type": "button"
+      },
+      "text": "Anuluj"
+    },
+    {
+      "attributes": {
+        "id": "planesToggle",
+        "aria-label": "Pokaż lub ukryj płaszczyzny",
+        "aria-pressed": "true",
+        "title": "Pokaż / ukryj płaszczyzny"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "id": "home",
+        "title": "Widok startowy (XY, izometria)",
+        "aria-label": "Przywróć widok startowy"
+      },
+      "text": "⌂"
+    },
+    {
+      "attributes": {
+        "class": "blank",
+        "tabindex": "-1"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "class": "z",
+        "data-view": "top",
+        "title": "Widok z góry (+Z)"
+      },
+      "text": "Z"
+    },
+    {
+      "attributes": {
+        "class": "blank",
+        "tabindex": "-1"
+      },
+      "text": ""
+    },
+    {
+      "attributes": {
+        "class": "x",
+        "data-view": "left",
+        "title": "Widok od -X"
+      },
+      "text": "−X"
+    },
+    {
+      "attributes": {
+        "class": "iso",
+        "data-view": "iso",
+        "title": "Izometria"
+      },
+      "text": "3D"
+    },
+    {
+      "attributes": {
+        "class": "x",
+        "data-view": "right",
+        "title": "Widok od +X"
+      },
+      "text": "X"
+    },
+    {
+      "attributes": {
+        "class": "y",
+        "data-view": "back",
+        "title": "Widok od -Y"
+      },
+      "text": "−Y"
+    },
+    {
+      "attributes": {
+        "class": "z",
+        "data-view": "bottom",
+        "title": "Widok od -Z"
+      },
+      "text": "−Z"
+    },
+    {
+      "attributes": {
+        "class": "y",
+        "data-view": "front",
+        "title": "Widok od +Y"
+      },
+      "text": "Y"
+    }
+  ]
+}

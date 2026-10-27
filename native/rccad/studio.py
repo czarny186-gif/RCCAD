@@ -203,6 +203,7 @@ class Studio(QWidget):
         menu.addSeparator()
         menu.addAction('Dodaj prostopadłościan',self.w.add_box);menu.addAction('Dodaj walec',self.w.add_cylinder)
         menu.addAction('Szkic z wymiarów',self.w.add_sketch)
+        menu.addAction('Lista obiektów',lambda:self.w.model_dock.setVisible(not self.w.model_dock.isVisible()))
         menu.exec(self.top.mapToGlobal(QPoint(0,self.top.height())))
 
     def context_menu(self,position):

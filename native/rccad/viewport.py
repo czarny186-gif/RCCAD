@@ -4,12 +4,17 @@ import numpy as np
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 from pyqtgraph.opengl import shaders
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QVariantAnimation, QEasingCurve, QEvent
 from PySide6.QtGui import QVector3D
 from .document import Body
 
 
 class CadView(gl.GLViewWidget):
+    planeClicked = Signal(str)
+    pointerMoved = Signal(float,float)
+    sketchDoubleClicked = Signal(float,float)
+    dimensionRequested = Signal()
+    operationRequested = Signal()
     sketchClicked = Signal(float, float)
     sketchMoved = Signal(float, float)
     faceClicked = Signal(str, object)
@@ -33,18 +38,16 @@ class CadView(gl.GLViewWidget):
                     varying vec4 v_color;
                     varying vec3 v_normal;
                     void main() {
-                        float diffuse = max(0.0, dot(normalize(v_normal), normalize(vec3(0.3, 0.6, 1.0))));
-                        gl_FragColor = vec4(v_color.rgb * (0.58 + 0.42 * diffuse), v_color.a);
+                        float diffuse = max(0.0, dot(normalize(v_normal), normalize(vec3(0.35, 0.5, 1.0))));
+                        gl_FragColor = vec4(v_color.rgb * (0.68 + 0.40 * floor(diffuse*24.0+0.5)/24.0), v_color.a);
                     }
                 """),
             ])
         self.setBackgroundColor('#edf1f5')
-        self.setCameraPosition(distance=120, elevation=25, azimuth=-55)
-        grid = gl.GLGridItem()
-        grid.setSize(200, 200)
-        grid.setSpacing(10, 10)
-        grid.setColor(pg.mkColor('#bac9d8'))
-        self.addItem(grid)
+        self.setCameraPosition(distance=210, elevation=31.51268, azimuth=132.971835)
+        from .appearance import HtmlBackground,HtmlGrid
+        self.background_item=HtmlBackground();self.addItem(self.background_item)
+        grid=HtmlGrid();self.grid_half=120;self.addItem(grid)
         self.grid_item = grid
         self.bodies = ()
         self.model_items = []
@@ -56,6 +59,8 @@ class CadView(gl.GLViewWidget):
         self.multi_select = False
         self._drag_position = None
         self._press = None
+        self._canvas_pan = False
+        self._pan_was_dragged = False
         self.sketch_mode = False
         self.face_mode = False
         self.profile_mode = False
@@ -63,7 +68,22 @@ class CadView(gl.GLViewWidget):
         self.preview_replacement = None
         self.handle_items = []
         self.handle = None
+        self.gizmo_handles = []
+        self.gizmo_center = None
         self.drag_handle = None
+        self.plane_mode = False
+        self.plane_items = []
+        self.plane_art = {}
+        self.hover_plane = None
+        self.ghost_hover = []
+        self.flash_color = None
+        self.camera_animation = QVariantAnimation(self)
+        self.camera_animation.setDuration(280);self.camera_animation.setEasingCurve(QEasingCurve.InOutCubic)
+        self.camera_animation.valueChanged.connect(self._camera_step)
+        self.flash_animation = QVariantAnimation(self);self.flash_animation.setDuration(360)
+        self.flash_animation.setStartValue(1.);self.flash_animation.setEndValue(0.)
+        self.flash_animation.valueChanged.connect(self._flash_step)
+
 
 
     def set_models(self, bodies, selected_bodies=(), selected_edges=None):
@@ -78,9 +98,11 @@ class CadView(gl.GLViewWidget):
                 continue
             replacement=self.preview_replacement is not None and self.preview_replacement[0]==body.id
             mesh = self.preview_replacement[1] if replacement else body.mesh
-            color = (.30, .53, .76, 1) if body.id in self.selected_bodies else (.64, .67, .72, 1)
+            color = (138/255,138/255,144/255,1)
             if replacement:color=(.28,.74,.55,1)
-            if len(mesh.triangles):
+            elif self.flash_color and body.kind=='solid' and body.id in self.flash_ids:
+                c,t=self.flash_color;color=tuple(color[j]*(1-t)+c[j]*t for j in range(3))+(1,)
+            if len(mesh.triangles) and body.kind!='sketch':
                 item = gl.GLMeshItem(vertexes=mesh.vertices, faces=mesh.triangles, smooth=True, color=color, shader='rccad', drawEdges=False)
                 item.setGLOptions('opaque')
                 from OpenGL import GL
@@ -88,8 +110,9 @@ class CadView(gl.GLViewWidget):
                 self.addItem(item)
                 self.model_items.append(item)
             for index, points in mesh.edges.items():
+                if (body.sketch_data or {}).get('type')=='construction':continue
                 selected = not replacement and index in self.selected_edges.get(body.id, set())
-                line = gl.GLLinePlotItem(pos=points, color=(1, .48, .05, 1) if selected else (.12, .16, .21, 1), width=3 if selected else 1, antialias=True, glOptions='opaque')
+                line = gl.GLLinePlotItem(pos=points, color=(.78, .10, .12, 1) if selected else ((.12,.43,.85,1) if body.kind=='sketch' or body.id in self.selected_bodies else (0,0,0,1)), width=3 if selected else 1, antialias=True, glOptions='opaque')
                 self.addItem(line)
                 self.model_items.append(line)
         self.update()
@@ -107,9 +130,91 @@ class CadView(gl.GLViewWidget):
         self.setCameraPosition(distance=max(20, float(np.linalg.norm(high - low)) * 1.6))
 
     def set_view(self, name):
-        values = {'iso': (25, -55), 'XY': (90, -90), '-XY': (-90, -90), 'XZ': (0, -90), '-XZ': (0, 90), 'YZ': (0, 0), '-YZ': (0, 180)}
+        values = {'iso': (31.51268,132.971835), 'XY': (90,90), '-XY': (-90,90), 'XZ': (0,90), '-XZ': (0,-90), 'YZ': (0,0), '-YZ': (0,180)}
         el, az = values[name]
-        self.setCameraPosition(elevation=el, azimuth=az)
+        self.animate_camera(el,az)
+
+    def animate_camera(self,elevation,azimuth,center=None):
+        if not self.isVisible():
+            if center is not None:self.opts['center']=QVector3D(*center)
+            self.setCameraPosition(elevation=elevation,azimuth=azimuth);return
+        self.camera_animation.stop()
+        old=np.array([self.opts['elevation'],self.opts['azimuth'],*self.opts['center'].toTuple()],dtype=float)
+        azimuth=old[1]+(azimuth-old[1]+180)%360-180
+        new=np.array([elevation,azimuth,*(center if center is not None else old[2:])],dtype=float)
+        self._camera_endpoints=(old,new)
+        self.camera_animation.setStartValue(0.);self.camera_animation.setEndValue(1.);self.camera_animation.start()
+
+    def _camera_step(self,t):
+        old,new=self._camera_endpoints;v=old*(1-t)+new*t
+        self.opts['center']=QVector3D(*map(float,v[2:]));self.setCameraPosition(elevation=float(v[0]),azimuth=float(v[1]))
+
+    def flash(self,color,identifiers=None):
+        if not self.isVisible():return
+        self.flash_ids=set(identifiers if identifiers is not None else [b.id for b in self.bodies])
+        self._flash_rgb=np.array(pg.mkColor(color).getRgbF()[:3]);self.flash_animation.stop();self.flash_animation.start()
+
+    def _flash_step(self,t):
+        self.flash_color=(self._flash_rgb,float(t)) if t>.001 else None
+        self.set_models(self.bodies,self.selected_bodies,self.selected_edges)
+
+    def show_planes(self,visible=True):
+        for item in self.plane_items:self.removeItem(item)
+        self.plane_items=[];self.plane_art={};self.hover_plane=None;self.plane_mode=visible
+        if not visible:return
+        from .interaction import frame_for,world_point
+        for name,color in [('XY',(64/255,133/255,235/255,.16)),('XZ',(56/255,171/255,112/255,.16)),('YZ',(226/255,92/255,98/255,.16))]:
+            points=np.array([world_point(frame_for(name),q) for q in [(-23,-23),(23,-23),(23,23),(-23,23)]])
+            face=gl.GLMeshItem(vertexes=points,faces=np.array([[0,1,2],[0,2,3]]),color=color,smooth=False,shader='balloon')
+            face.setGLOptions('translucent');self.addItem(face);self.plane_items.append(face)
+            edge=gl.GLLinePlotItem(pos=np.vstack([points,points[0]]),color=(*color[:3],.8),width=2,antialias=True)
+            self.addItem(edge);self.plane_items.append(edge);self.plane_art[name]=(face,edge,color)
+
+    def hover_planes(self,x,y):
+        name=self.pick_plane(x,y)
+        if name==self.hover_plane:return
+        self.hover_plane=name
+        for key,(face,edge,color) in self.plane_art.items():
+            face.setColor((*color[:3],.28 if key==name else .16));edge.setData(color=(*color[:3],.95 if key==name else .62),width=2.3 if key==name else 1.5)
+        self.setCursor(Qt.PointingHandCursor if name else Qt.OpenHandCursor)
+
+    def pick_plane(self,x,y):
+        from .interaction import frame_for,plane_point,world_point
+        ray=self._ray(x,y)
+        if ray is None:return None
+        best=None
+        for name in ['XY','XZ','YZ']:
+            q=plane_point(frame_for(name),*ray)
+            if q is None or not all(abs(v)<=23.0001 for v in q):continue
+            d=np.linalg.norm(np.array(world_point(frame_for(name),q))-ray[0])
+            if best is None or d<best[0]:best=(d,name)
+        return best[1] if best else None
+
+    def hover_at(self,x,y):
+        for item in self.ghost_hover:self.removeItem(item)
+        self.ghost_hover=[]
+        if self.sketch_mode or self.plane_mode or self.drag_handle:return
+        hit=self.nearest_edge(x,y) if self.edge_mode else None
+        ray=self._ray(x,y);bodyhit=self._hit(*ray) if ray else None
+        identifier=hit[0] if hit else self.pick_profile(x,y) if self.profile_mode else bodyhit[1] if bodyhit else None
+        body=next((b for b in self.bodies if b.id==identifier),None)
+        if not body or not body.mesh:return
+        for index,points in body.mesh.edges.items():
+            if hit and index!=hit[1]:continue
+            item=gl.GLLinePlotItem(pos=points,color=(.18,.53,.9,.8),width=2,antialias=True,glOptions='opaque')
+            self.addItem(item);self.ghost_hover.append(item)
+
+    def projectionMatrix(self,region,viewport):
+        # HTML's canvas projection uses the opposite horizontal handedness.
+        # Reflect only the display projection; all model coordinates remain exact CAD.
+        from PySide6.QtGui import QMatrix4x4
+        from math import atan,degrees
+        self.opts['fov']=degrees(2*atan(max(1,self.width())/(2*max(1,min(self.width(),self.height()))*1.45)))
+        projection=super().projectionMatrix(region,viewport);mirror=QMatrix4x4();mirror.scale(-1.,1.,1.)
+        return mirror*projection
+
+    def pan(self,dx,dy,dz,relative='global'):
+        return super().pan(-dx if relative in ('view','view-upright') else dx,dy,dz,relative)
 
     def camera_matrix(self):
         viewport = (0, 0, max(1,self.width()), max(1,self.height()))
@@ -166,7 +271,7 @@ class CadView(gl.GLViewWidget):
     def _hit(self, origin, direction):
         best = None
         for body in self.bodies:
-            if not body.visible or not body.mesh or not len(body.mesh.triangles):
+            if not body.visible or body.kind=='sketch' or not body.mesh or not len(body.mesh.triangles):
                 continue
             v = body.mesh.vertices[body.mesh.triangles]
             e1, e2 = v[:, 1]-v[:, 0], v[:, 2]-v[:, 0]
@@ -193,6 +298,23 @@ class CadView(gl.GLViewWidget):
         origin, direction = ray
         hit = self._hit(origin, direction)
         return hit is None or hit[0] >= np.linalg.norm(point-origin)-.25
+
+    def sync_grid(self):
+        if not hasattr(self,'grid_item'):return
+        pixels=max(1,min(self.width(),self.height()))*1.45/max(.001,self.opts['distance'])
+        candidates=[.1,.2,.5,1,2,5,10]
+        step=next((v for v in candidates if v*pixels>=17 and 2*self.grid_half/v<=1200),None)
+        if step is None:step=max(10,float(np.ceil(self.grid_half/600/10)*10))
+        self.grid_item.rebuild(self.grid_half,step)
+
+    def setCameraPosition(self,*args,**kwargs):
+        super().setCameraPosition(*args,**kwargs);self.sync_grid()
+
+    def wheelEvent(self,event):
+        super().wheelEvent(event);self.sync_grid()
+
+    def resizeGL(self,w,h):
+        super().resizeGL(w,h);self.sync_grid()
 
     def set_sketch_plane(self,frame):
         from PySide6.QtGui import QMatrix4x4
@@ -237,6 +359,7 @@ class CadView(gl.GLViewWidget):
     def set_handle(self,point,normal=None,kind=None):
         for item in self.handle_items:self.removeItem(item)
         self.handle_items=[]
+        self.gizmo_handles=[]
         self.handle=None if point is None else (np.array(point,dtype=float),np.array(normal,dtype=float),kind)
         if self.handle:
             point,normal,kind=self.handle
@@ -249,6 +372,25 @@ class CadView(gl.GLViewWidget):
                 item.setGLOptions('translucent');self.addItem(item);self.handle_items.append(item)
         self.update()
 
+    def set_gizmo(self,center,size,rotate=False):
+        self.set_handle(None);self.gizmo_center=np.array(center,dtype=float)
+        length=max(6,float(size));colors=[(.88,.26,.30,1),(.17,.64,.39,1),(.22,.49,.9,1)]
+        for i,axis in enumerate(np.eye(3)):
+            if rotate:
+                u=np.eye(3)[(i+1)%3];v=np.eye(3)[(i+2)%3];angles=np.linspace(0,2*np.pi,96)
+                curve=self.gizmo_center+(np.cos(angles)[:,None]*u+np.sin(angles)[:,None]*v)*length
+                point=curve[12];kind='rotate_'+str(i)
+                pick=curve
+            else:
+                point=self.gizmo_center+axis*length;curve=np.array([self.gizmo_center,point]);kind='transform_'+str(i);pick=point.reshape(1,3)
+            line=gl.GLLinePlotItem(pos=curve,color=colors[i],width=3,antialias=True)
+            self.addItem(line);self.handle_items.append(line)
+            if not rotate:
+                dot=gl.GLScatterPlotItem(pos=point.reshape(1,3),color=colors[i],size=18,pxMode=True);self.addItem(dot);self.handle_items.append(dot)
+            self.gizmo_handles.append((point,axis,kind,pick))
+        self.handle=self.gizmo_handles[0][:3]
+        self.update()
+
     def pick_profile(self,x,y):
         import cadquery as cq
         from .interaction import plane_point, frame_for
@@ -258,6 +400,7 @@ class CadView(gl.GLViewWidget):
         for body in self.bodies:
             if not body.visible or body.kind!='sketch':continue
             try:
+                if (body.sketch_data or {}).get('type') in ('construction','point') or (body.sketch_data or {}).get('region_source'):continue
                 frame=body.frame or frame_for(body.plane)
                 q=plane_point(frame,*ray)
                 if q is None:continue
@@ -265,8 +408,8 @@ class CadView(gl.GLViewWidget):
                 point=world_point(frame,q)
                 depth=np.linalg.norm(np.array(point)-ray[0])
                 if solid and solid[0]<depth-.3:continue
-                if body.shape.IsClosed():
-                    face=cq.Face.makeFromWires(body.shape)
+                if body.shape.Faces() or body.shape.IsClosed():
+                    face=body.shape if body.shape.Faces() else cq.Face.makeFromWires(body.shape)
                     inside=face.distance(cq.Vertex.makeVertex(*point))<.1
                 else:inside=False
                 if inside and (best is None or depth<best[0]-1e-4 or (abs(depth-best[0])<1e-4 and face.Area()<best[2])):best=(depth,body.id,face.Area())
@@ -277,13 +420,23 @@ class CadView(gl.GLViewWidget):
         return None
 
     def mouseMoveEvent(self, event):
+        self.pointerMoved.emit(event.position().x(),event.position().y())
+        if self._canvas_pan:
+            pos=event.position();delta=pos-self._drag_position;self._drag_position=pos
+            self.pan(delta.x(),delta.y(),0,relative='view-upright')
+            if self._press and np.hypot(pos.x()-self._press[0],pos.y()-self._press[1])>4:self._pan_was_dragged=True
+            event.accept();return
         if self.drag_handle is not None:
             point,normal,kind,last=self.drag_handle
             current=event.position()
             xy,_,_=self.project_points(np.array([point,point+normal]))
             vector=xy[1]-xy[0];denom=float(vector@vector)
             delta=np.array([current.x()-last.x(),current.y()-last.y()])
-            amount=float(delta@vector/denom) if denom>.04 else -float(delta[1])*self.opts['distance']/max(1,self.height())
+            if kind.startswith('rotate_'):
+                center=self.project_points(np.array([self.gizmo_center]))[0][0]
+                a=np.array([last.x(),last.y()])-center;b=np.array([current.x(),current.y()])-center
+                amount=float((np.degrees(np.arctan2(b[1],b[0])-np.arctan2(a[1],a[0]))+180)%360-180)
+            else:amount=float(delta@vector/denom) if denom>.04 else -float(delta[1])*self.opts['distance']/max(1,self.height())
             self.drag_handle=(point+normal*amount,normal,kind,current)
             self.handleDragged.emit(kind,amount);event.accept();return
         if self.sketch_mode and self.mouse_mode=='select':
@@ -305,21 +458,42 @@ class CadView(gl.GLViewWidget):
     def mousePressEvent(self, event):
         self._drag_position = event.position()
         self._press = (event.position().x(), event.position().y(), event.button())
+        self._pan_was_dragged=False
+        self._canvas_pan=event.button()==Qt.RightButton or (self.sketch_mode and event.button()==Qt.LeftButton and bool(event.modifiers() & Qt.ShiftModifier))
+        if self._canvas_pan:event.accept();return
+        if self.gizmo_handles and event.button()==Qt.LeftButton:
+            pos=np.array([event.position().x(),event.position().y()]);best=None
+            for point,normal,kind,curve in self.gizmo_handles:
+                xy,_,_=self.project_points(curve)
+                distances=np.linalg.norm(xy-pos,axis=1);distance=float(distances.min())
+                if distance<14 and (best is None or distance<best[0]):best=(distance,point,normal,kind)
+            if best is not None:
+                _,point,normal,kind=best;self.drag_handle=(point,normal,kind,event.position());event.accept();return
         if self.handle is not None and event.button()==Qt.LeftButton:
             point,normal,kind=self.handle
             xy,_,_=self.project_points(point.reshape(1,3))
             if np.linalg.norm(xy[0]-[event.position().x(),event.position().y()])<18:
                 self.drag_handle=(point,normal,kind,event.position());event.accept();return
-        if (self.sketch_mode or self.face_mode) and self.mouse_mode=='select':event.accept();return
+        if (self.sketch_mode or self.face_mode or self.plane_mode) and self.mouse_mode=='select':event.accept();return
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
+        if self._canvas_pan:
+            self._canvas_pan=False;self._press=None;event.accept();return
         if self.drag_handle is not None:
             self.drag_handle=None;self._press=None;event.accept();return
         super().mouseReleaseEvent(event)
         if not self._press:return
         x,y,button=self._press;self._press=None
         if self.mouse_mode!='select' or button!=Qt.LeftButton or np.hypot(event.position().x()-x,event.position().y()-y)>4:return
+        if self.plane_mode:
+            ray=self._ray(x,y);hit=self._hit(*ray) if ray else None
+            if hit:self.faceClicked.emit(hit[1],tuple(ray[0]+ray[1]*hit[0]));return
+            profile=self.pick_profile(x,y)
+            if profile:self.profileClicked.emit(profile);return
+            plane=self.pick_plane(x,y)
+            if plane:self.planeClicked.emit(plane)
+            return
         if self.sketch_mode:self.sketchClicked.emit(x,y);return
         if self.face_mode:
             ray=self._ray(x,y);hit=self._hit(*ray) if ray else None
@@ -340,7 +514,21 @@ class CadView(gl.GLViewWidget):
             if hit:self.bodyClicked.emit(hit[1],additive)
             elif not additive:self.selectionCleared.emit()
 
+    def mouseDoubleClickEvent(self,event):
+        if event.button()==Qt.LeftButton:
+            self.sketchDoubleClicked.emit(event.position().x(),event.position().y());event.accept();return
+        super().mouseDoubleClickEvent(event)
+
+    def event(self,event):
+        if event.type()==QEvent.KeyPress and event.key()==Qt.Key_Tab and self.sketch_mode:
+            self.dimensionRequested.emit();event.accept();return True
+        return super().event(event)
+
     def keyPressEvent(self,event):
+        if event.key()==Qt.Key_Tab and self.sketch_mode:
+            self.dimensionRequested.emit();event.accept();return
+        if event.key() in (Qt.Key_Return,Qt.Key_Enter) and not self.sketch_mode:
+            self.operationRequested.emit();event.accept();return
         if event.key()==Qt.Key_Escape:
             self.editCancelled.emit();event.accept();return
         if event.key() in (Qt.Key_Return,Qt.Key_Enter) and self.sketch_mode:

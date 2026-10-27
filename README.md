@@ -7,8 +7,9 @@ Natywna aplikacja Qt z silnikiem bryłowym OpenCascade. Kod i instrukcje:
 
 **[Pobierz wydanie Windows z Releases](https://github.com/czarny186-gif/RCCAD/releases)**
 
-Rozpakuj całą paczkę i uruchom `RCCAD Desktop.exe`. Wersja 0.3 przenosi układ
-i obsługę myszą z HTML: szkice na płaszczyznach i ścianach, wyciąganie i wycinanie
+Rozpakuj całą paczkę i uruchom `RCCAD Desktop.exe`. Wersja 0.4 przenosi układ
+i obsługę myszą z HTML, wszystkie grafiki i efekty: narzędzia szkicu, wymiary,
+tekst, nożyczki, zamknięte obszary, szkice na ścianach, wyciąganie i wycinanie
 z uchwytem, podglądy CAD oraz panele operacji. Zachowuje silnik OpenCascade, otwory, zaokrąglenia,
 operacje Boolean, projekty i import/eksport. Pełna lista oraz ograniczenia
 znajdują się w instrukcji wersji desktopowej. Budowanie i uruchomienie gotowego

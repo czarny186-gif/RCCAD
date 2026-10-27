@@ -66,7 +66,7 @@ class NativeUiTests(unittest.TestCase):
         self.window.run_operation('Błąd',lambda:body.changed(k.blend(body.shape,[0],1000)),lambda r:self.window.replace_body(body,r))
         self.wait()
         self.assertEqual(self.window.document.bodies[0],body)
-        self.assertEqual(self.warning_mock.call_count,1)
+        self.assertIn('pozostał bez zmian',self.window.studio.last_notice)
         self.assertTrue(self.window.tree.isEnabled())
 
     def test_edge_selection_and_fillet_apply(self):

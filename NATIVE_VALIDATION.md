@@ -1,4 +1,4 @@
-# RCCAD Desktop 0.1 — weryfikacja wydania
+# RCCAD Desktop — weryfikacja wydań
 
 - Kod aplikacji: `d26080aab98417e72da23367ca65d681f26357c7`.
 - Proces Windows: https://github.com/czarny186-gif/RCCAD/actions/runs/40385478786
@@ -60,3 +60,32 @@ zużyte profile są ukrywane w tej samej transakcji, z poprawnym undo/redo.
 Przykładowe zrzuty: [szkic](native/docs/szkic.png), [krawędzie](native/docs/krawedzie.png).
 Nie deklarujemy pełnej zgodności narzędzi z HTML: tekst/SVG, zaawansowana edycja
 istniejących figur i więzy parametryczne nie zostały przeniesione.
+
+
+## Wersja 0.4 — projektowanie i wszystkie grafiki HTML (27.10.2026)
+
+Przeniesiono wszystkie 24 grafiki kontrolek: 6 PNG, 15 SVG i 3 symbole.
+Manifest zasobów zawiera hashe i identyfikatory z oryginalnego HTML.
+Dołączono trzy czcionki DejaVu z licencją. Gradient, siatka, płaszczyzny,
+materiał, krawędzie i perspektywa odtwarzają stałe i zachowanie renderera HTML.
+Moduł `native/rccad/kernel.py` nadal pozostaje bez zmian.
+
+76 testów obejmuje narzędzia z HTML, dokładne krzywe i tekst o zadanej wysokości,
+nożyczki, przecięcia i styczność, zamknięte obszary (także z przecinających się
+odcinków), dwustronne wyciągnięcia, zachowanie wspólnych punktów przy edycji,
+wybór obszaru przecięcia, atomowe cofanie, lustro względem ściany i zasoby SVG/PNG.
+
+Dwie serie prób w wyświetlonym oknie OpenGL to 8 poprzednich scenariuszy
+modelowania i 12 kontraktów interfejsu/animacji. Zapis GIF powstał z klatek
+rzeczywiście działającego okna, bez makiety. Testy przechwytują nieobsłużone
+wyjątki ze slotów Qt, aby błąd obsługi myszy nie mógł dać fałszywego sukcesu.
+
+Natywny `BOPAlgo_Splitter`/`BOPAlgo_BuilderFace` rozpoznaje obszary przed
+wyciągnięciem. Sam wybór, podgląd i anulowanie nie zapisują ich w dokumencie.
+Zatwierdzenie regionów i bryły jest jedną transakcją. Wspólne punkty szkicu
+zmieniają się razem; błędy pozostawiają poprzednią geometrię.
+
+Rozszerzony self-test gotowego EXE sprawdza również dołączone fonty i otwory
+liter, 24 grafiki, analityczne przycinanie i natywne obszary przecięcia.
+Workflow Windows blokuje publikację, jeżeli którykolwiek test nie przejdzie.
+Szczegółowy zakres i granice zgodności: [HTML_PARITY.md](native/HTML_PARITY.md).

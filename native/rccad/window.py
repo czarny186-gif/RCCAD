@@ -142,7 +142,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Gotowy · mm · lewy przycisk: obrót / wybór · środkowy: przesuwanie · rolka: zoom")
         self._style()
         self.refresh()
-        from .studio import Studio
+        from .classic import ClassicStudio as Studio
         # Keep the existing menu actions and CAD commands; replace only their presentation.
         self.takeCentralWidget()
         self.studio = Studio(self)
@@ -167,6 +167,7 @@ class MainWindow(QMainWindow):
             action.setShortcut(shortcut)
         action.triggered.connect(callback)
         self.actions.append(action)
+        self.addAction(action)
         return action
 
     def _menus(self):
@@ -412,7 +413,8 @@ class MainWindow(QMainWindow):
                 self.refresh(fit)
         def failed(message):
             finish()
-            QMessageBox.warning(self, "Nie można wykonać operacji", message + "\n\nDotychczasowy model pozostał bez zmian.")
+            if hasattr(self,'studio') and hasattr(self.studio,'notify'):self.studio.notify(message + "\nDotychczasowy model pozostał bez zmian.")
+            else:QMessageBox.warning(self, "Nie można wykonać operacji", message + "\n\nDotychczasowy model pozostał bez zmian.")
             self.refresh()
         def finish():
             self.busy = False
@@ -487,6 +489,8 @@ class MainWindow(QMainWindow):
         self.run_operation('Operacja na bryłach',build,lambda r:self.replace_body(base,r))
 
     def start_blend(self, kind):
+        if hasattr(self,'studio'):
+            self.studio.begin_blend();self.blend_type.setCurrentIndex(0 if kind=='fillet' else 1);self.mouse_modes.buttons()[0].setChecked(True);return
         self.set_mouse_mode("select")
         self.mouse_modes.buttons()[0].setChecked(True)
         self.view.edge_mode=True;self.blend_panel.show();self.blend_type.setCurrentIndex(0 if kind=='fillet' else 1)
@@ -614,8 +618,12 @@ class MainWindow(QMainWindow):
         if path:self.run_operation('Eksportowanie',lambda:kernel.export_shapes([b.shape for b in bodies],path),lambda _:None)
 
     def keyPressEvent(self,event):
+        if event.key() in (Qt.Key_Return,Qt.Key_Enter) and not self.busy and hasattr(self,'studio') and hasattr(self.studio,'accept_operation') and self.studio.mode!='sketch':
+            self.studio.accept_operation();event.accept();return
         if event.key()==Qt.Key_Escape and not self.busy:
-            if hasattr(self,'studio'):self.studio.cancel_points()
+            if hasattr(self,'studio'):
+                if hasattr(self.studio,'escape'):self.studio.escape()
+                else:self.studio.cancel_points()
             else:self.end_blend()
             event.accept();return
         super().keyPressEvent(event)

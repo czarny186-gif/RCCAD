@@ -24,7 +24,7 @@ class DisplayedStudioTests(StudioTests):
         self.wait()
 
     def test_extrude_and_transform_handles_and_snapshot(self):
-        self.s.begin_sketch();self.draw('rectangle',[(0,0),(30,20)])
+        self.s.begin_sketch();self.s.select_plane('XY');self.draw('rectangle',[(0,0),(30,20)])
         self.s.begin_extrude();self.wait();self.assertIsNotNone(self.w.view.handle)
         before=self.s.depth.value();self.drag_handle(8)
         self.assertGreater(self.s.depth.value(),before+5)
@@ -48,7 +48,7 @@ class DisplayedStudioTests(StudioTests):
         folder=Path(sys.argv[1]) if len(sys.argv)>1 else Path('/tmp')
         folder.mkdir(parents=True,exist_ok=True)
         self.w.grab().save(str(folder/'RCCAD_Studio_krawedzie.png'))
-        self.s.begin_sketch();self.s.choose_face();self.w.view.fit_all()
+        self.s.begin_sketch();self.s.select_plane('XY');self.s.choose_face();self.w.view.fit_all()
         top=max(body.shape.Faces(),key=lambda f:f.Center().z)
         self.click_world(top.Center().toTuple())
         self.assertEqual(self.s.support,body.id)

@@ -1,4 +1,4 @@
-# RCCAD Desktop 0.3 — Windows 10/11 x64
+# RCCAD Desktop 0.4 — Windows 10/11 x64
 
 Nowy program desktopowy: natywne okno Qt i modelowanie bryłowe OpenCascade.
 Nie uruchamia przeglądarki ani serwera WWW. To wersja rozwojowa,
@@ -6,7 +6,7 @@ nie pełny zamiennik wszystkich narzędzi starszego pliku HTML.
 
 ## Pobranie EXE
 
-W repozytorium otwórz **Releases → RCCAD Desktop 0.3 — Windows x64** i pobierz
+W repozytorium otwórz **Releases → RCCAD Desktop 0.4 — Windows x64** i pobierz
 **RCCAD-Desktop-Windows-x64.zip**. Rozpakuj archiwum w całości i uruchom
 **RCCAD Desktop.exe** z folderu `RCCAD Desktop`. Zachowaj obok niego cały katalog
 `_internal`; sam plik EXE nie zawiera bibliotek aplikacji.
@@ -42,7 +42,7 @@ bryły. Zaznaczone krawędzie odpowiadają topologii CAD, a nie krawędziom tró
 W programie HTML wyeksportuj **STEP**, a następnie użyj **Importuj** w RCCAD
 Desktop. Pliki projektu JSON ze starego programu nie są nowym formatem
 `.rccadx`. STL jest siatką: nie daje takich samych możliwości edycji jak STEP.
-Nie ma jeszcze więzów parametrycznych, tekstu, SVG ani pełnej historii cech.
+Nie ma jeszcze więzów parametrycznych, importera plików SVG ani pełnej historii cech.
 Odcinki i łuki są otwartymi krzywymi; bryłę wyciąga się z zamkniętego profilu.
 
 ## Uruchomienie ze źródeł
@@ -77,36 +77,37 @@ Wynik: `dist/RCCAD Desktop/RCCAD Desktop.exe`. PyInstaller wymaga budowania
 na docelowym systemie: uruchomienie go na Linuksie nie tworzy pliku Windows EXE.
 Automatyczny proces Windows znajduje się w `.github/workflows/native-windows.yml`.
 
-## Interfejs 0.3 — sposób pracy z HTML
+## Interfejs 0.4 — projektowanie jak w HTML
 
-Sześć głównych przycisków i pływające panele nawiązują do programu HTML.
-„Model” pokazuje drzewo obiektów. Prawy przycisk otwiera menu kontekstowe.
-„Wiele” pozwala dodawać bryły i krawędzie bez Ctrl/Shift.
+[Zakres przeniesionych grafik, gestów i efektów](HTML_PARITY.md).
 
-1. Kliknij **Szkic**, wybierz płaszczyznę lub wskaż płaską ścianę bryły.
-2. Wybierz figurę i klikaj jej punkty w widoku. Prostokąt: dwa narożniki;
-   okrąg: środek i punkt promienia; fasolka: dwa środki i punkt szerokości.
-   Profil łamany zamknij kliknięciem pierwszego punktu albo przyciskiem.
-3. Wybierz **Zakończ szkic**, następnie **Wyciągnij**. Kliknij wnętrze profilu,
-   wybierz operację, bryłę docelową i odległość. Pomarańczową strzałkę można przeciągać.
-4. Przy wycinaniu dodatnia odległość prowadzi w głąb ściany; ujemna odwraca kierunek.
-   Domyślnie wewnętrzne kontury są otworami (bez zagnieżdżonych wysp).
-5. **Zastosuj** zapisuje wynik. Podgląd i Zamknij nie zmieniają geometrii.
+1. Kliknij **Szkic**, a następnie płaszczyznę XY/XZ/YZ albo płaską ścianę.
+2. Z pionowego paska wybierz narzędzie. Strzałka obok prostokąta/okręgu rozwija warianty.
+3. Wskaż punkty figury. **Tab** otwiera wymiary przy kursorze; **Enter** zatwierdza.
+   Dwuklik istniejącego wymiaru pozwala go zmienić. Nożyczki usuwają fragment krzywej.
+4. Kliknij **Wyciągnij** i wskaż zamknięty obszar. Przecięcia odcinków i figur tworzą
+   osobne obszary; **Shift + klik** pozwala wybrać kilka.
+5. Ustaw operację i kierunek po lewej, odległości w pasku obok albo uchwytem.
+   Przy wycinaniu dodatnia odległość prowadzi w głąb ściany.
+6. **Zastosuj** zapisuje jedną transakcję. Anulowanie podglądu nie zmienia geometrii.
 
-W szkicu: siatka i przyciąganie, Esc anuluje bieżącą figurę, Cofnij punkt usuwa
-ostatni wierzchołek. Dokładną figurę możesz też utworzyć z pól wymiarów od
-pierwszego klikniętego punktu. Dłuższy panel przewija się rolką.
-Przyciski Obrót i Przesuń widok umożliwiają nawigację bez przerywania szkicu.
+Tekst ma wysokość, obrót, krój i wyrównanie. Dołączone czcionki DejaVu tworzą
+prawdziwe kontury CAD z otworami liter. Linie konstrukcyjne i punkty nie są wyciągane.
 
-Zaokrąglenie/faza: kliknij krawędzie, ustaw rozmiar uchwytem lub polem, wybierz
-**Podgląd**, a potem **Zastosuj**. Podgląd rozwiązuje oryginalny silnik OpenCascade.
-Przesunięcie i obrót mają osobny panel oraz uchwyt aktywnej osi.
+Dolne przyciski przesunięcia/obrotu otwierają pasek XYZ. Kolorowe uchwyty działają
+również na szkicach. Odbicie: wybierz obiekt, wskaż płaską ścianę i zastosuj
+kopię, zastąpienie albo połączenie. Boolean ma opcję zachowania brył-narzędzi.
 
-Proste bryły i dawny szkic z wymiarów są też w menu pod pierwszym przyciskiem.
-Wersja 0.3 zachowuje silnik, format BREP i moduł `kernel.py` z wcześniejszego EXE.
+Prawy przycisk lub Shift + lewy przesuwa widok; rolka przybliża. Esc anuluje
+pole/figurę, a kolejny Esc zamyka narzędzie. Przycisk domu odtwarza widok startowy.
+Dodatkowe polecenia i lista obiektów są w menu pod ikoną pliku.
 
-Testy z rzeczywistym widokiem OpenGL (na maszynie z ekranem):
+Podglądy liczy ten sam silnik CAD co wynik. Błędy są komunikatami w rogu okna;
+poprzednia bryła pozostaje bez zmian. Zaokrąglenia i fazy mają podgląd automatyczny.
+
+Testy w rzeczywistym oknie OpenGL:
 
 ```sh
 PYTHONPATH=.:tests python tests/studio_smoke.py /tmp/rccad-screenshots
+PYTHONPATH=.:tests python tests/classic_smoke.py /tmp/rccad-screenshots
 ```

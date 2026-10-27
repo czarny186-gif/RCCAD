@@ -24,6 +24,7 @@ class Body:
 
     frame: tuple | None = None
     support_id: str | None = None
+    sketch_data: dict | None = field(default=None, compare=False)
 
     def prepared(self):
         return replace(self, mesh=display_mesh(self.shape))
@@ -91,7 +92,7 @@ class Document:
                     cq.exporters.export(body.shape, str(source), exportType="BREP")
                     member = f"bodies/{body.id}.brep"
                     archive.write(source, member)
-                    manifest['bodies'].append(dict(id=body.id, name=body.name, kind=body.kind, plane=body.plane, visible=body.visible, file=member, frame=body.frame, support_id=body.support_id))
+                    manifest['bodies'].append(dict(id=body.id, name=body.name, kind=body.kind, plane=body.plane, visible=body.visible, file=member, frame=body.frame, support_id=body.support_id, sketch_data=body.sketch_data))
                 archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False))
             os.replace(temp_path, path)
             self.path = path
@@ -132,7 +133,7 @@ class Document:
                     support = item.get('support_id')
                     if support is not None and not re.fullmatch('[0-9a-f]{32}', str(support)):
                         raise CadError("Nieprawidłowe powiązanie szkicu.")
-                    bodies.append(Body(str(item['name']), shape, kind, plane, identifier, bool(item.get('visible', True)), frame=frame, support_id=support).prepared())
+                    bodies.append(Body(str(item['name']), shape, kind, plane, identifier, bool(item.get('visible', True)), frame=frame, support_id=support, sketch_data=checked_sketch_data(item.get('sketch_data'))).prepared())
                 result.bodies = tuple(bodies)
                 result.path = Path(path)
                 return result
@@ -140,3 +141,13 @@ class Document:
             raise
         except Exception as exc:
             raise CadError("Nie można otworzyć projektu. Plik może być uszkodzony lub mieć inny format.") from exc
+
+
+def checked_sketch_data(data):
+    if data is None:return None
+    if not isinstance(data,dict) or len(json.dumps(data))>100000:raise CadError('Nieprawidłowy opis szkicu.')
+    if not isinstance(data.get('type'),str) or len(data['type'])>32:raise CadError('Nieprawidłowe narzędzie szkicu.')
+    pts=data.get('points',[])
+    import math
+    if not isinstance(pts,list) or len(pts)>4096 or any(not isinstance(p,(list,tuple)) or len(p)!=2 or any(not isinstance(v,(int,float)) or not math.isfinite(v) or abs(v)>1e9 for v in p) for p in pts):raise CadError('Nieprawidłowe punkty szkicu.')
+    return data

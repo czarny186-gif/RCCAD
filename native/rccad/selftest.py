@@ -34,6 +34,20 @@ def run(report_path=None):
     cut=g.apply_profile(cutter,60,'subtract',Body('Połączona',joined))
     assert cut.isValid() and cut.Volume()<joined.Volume()
     checks.append('graphical profiles, face placement, joined extrusion and profile cut')
+    letter=g.profile('text',g.frame_for(),[(0,0)],text='B',text_size=10)
+    assert len(letter.Faces()[0].innerWires())==2
+    text_solid=g.extrusion(Body('B',letter,'sketch',frame=g.frame_for()),3)
+    assert text_solid.isValid() and abs(text_solid.Volume()-letter.Area()*3)<1e-5
+    checks.append('bundled DejaVu font, exact text glyph holes and text extrusion')
+    import cadquery as cq
+    line=cq.Edge.makeLine((-10,0,0),(10,0,0))
+    others=[cq.Edge.makeLine((x,-5,0),(x,5,0)) for x in (-3,3)]
+    pieces=g.trim_segments(line,others,(0,0,0));assert len(pieces)==2 and abs(sum(e.Length() for e in pieces)-14)<1e-6
+    checks.append('native analytic scissors intersections')
+    a=Body('A',g.profile('circle',g.frame_for(),[(0,0),(5,0)]),'sketch',frame=g.frame_for())
+    b=Body('B',g.profile('circle',g.frame_for(),[(5,0),(10,0)]),'sketch',frame=g.frame_for())
+    cells=g.design_regions([a,b]);assert len(cells)==3 and all(face.isValid() for face,*_ in cells)
+    checks.append('OpenCascade planar cells for selectable sketch intersections')
     doc=Document();body=Body('Zaokrąglona kostka',rounded).prepared();doc.commit([body])
     doc.undo();assert not doc.bodies;doc.redo();assert len(doc.bodies)==1
     with tempfile.TemporaryDirectory(prefix='rccad-check-') as directory:
@@ -57,7 +71,10 @@ def run(report_path=None):
     projected,_,_=window.view.project_points(body.mesh.vertices[:3])
     assert window.view._ray(float(projected[0][0]),float(projected[0][1])) is not None
     assert all(not window.studio.buttons[key].icon().isNull() for key in ['sketch','extrude','boolean','blend','mirror'])
-    checks.append('bundled HTML pictograms and native graphical workspace')
+    from .artwork import CATALOG,icon
+    assert len(CATALOG['images'])==6 and len(CATALOG['buttons'])==24
+    assert all(not icon(name).isNull() for name in CATALOG['buttons'])
+    checks.append('all 24 original HTML graphics and native graphical workspace')
     checks.append('Qt coordinate projection and picking ray')
     window.document._saved_revision=window.document._revision
     window.close();app.processEvents()
