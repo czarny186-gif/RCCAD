@@ -3,17 +3,68 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 import traceback
-from PySide6.QtCore import Qt, QObject, Signal, QRunnable, QThreadPool, QTimer
-from PySide6.QtGui import QAction, QKeySequence
+from PySide6.QtCore import Qt, QObject, Signal, QRunnable, QThreadPool, QTimer, QSize, QPoint
+from PySide6.QtGui import QAction, QKeySequence, QIcon, QPixmap, QPainter, QColor, QPen
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QDockWidget,
     QTreeWidget, QTreeWidgetItem, QAbstractItemView, QToolBar, QDoubleSpinBox,
     QPushButton, QComboBox, QFormLayout, QDialog, QDialogButtonBox,
-    QFileDialog, QMessageBox, QCheckBox, QProgressBar, QStyle, QHeaderView,
+    QFileDialog, QMessageBox, QCheckBox, QProgressBar, QStyle, QHeaderView, QTabWidget, QToolButton, QButtonGroup,
 )
 from . import __version__, kernel
 from .document import Body, Document
 from .viewport import CadView
+
+
+def tool_icon(symbol, color):
+    """Resolution-independent, bundled CAD pictograms; no external icon fonts."""
+    pixmap = QPixmap(96, 96)
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing)
+    painter.setPen(QPen(QColor(color), 5, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+    painter.setBrush(QColor(color).lighter(180))
+    if symbol in ('circle', 'hole'):
+        painter.drawRoundedRect(15, 20, 66, 62, 10, 10)
+        painter.setBrush(QColor('white'))
+        painter.drawEllipse(28, 29, 40, 28 if symbol == 'circle' else 40)
+    elif symbol in ('union', 'cut', 'intersect'):
+        painter.drawRoundedRect(12, 15, 47, 47, 5, 5)
+        painter.setBrush(QColor(color).lighter(140))
+        painter.drawRoundedRect(37, 38, 47, 47, 5, 5)
+        painter.setPen(QPen(QColor('white'), 5))
+        painter.drawLine(48, 61, 73, 61)
+        if symbol == 'union': painter.drawLine(60, 49, 60, 73)
+    elif symbol == 'up':
+        painter.drawRect(18, 49, 60, 31)
+        painter.drawLine(48, 56, 48, 12)
+        painter.drawLine(48, 12, 32, 29)
+        painter.drawLine(48, 12, 64, 29)
+    elif symbol in ('round', 'chamfer'):
+        from PySide6.QtGui import QPainterPath
+        path = QPainterPath(); path.moveTo(17, 81); path.lineTo(17, 45)
+        if symbol == 'round': path.quadTo(17, 17, 45, 17)
+        else: path.lineTo(45, 17)
+        path.lineTo(81, 17); path.lineTo(81, 81); path.closeSubpath()
+        painter.drawPath(path)
+    elif symbol == 'move':
+        for x1, y1, x2, y2 in [(12,48,84,48),(48,12,48,84),(12,48,26,34),(12,48,26,62),(84,48,70,34),(84,48,70,62),(48,12,34,26),(48,12,62,26),(48,84,34,70),(48,84,62,70)]:
+            painter.drawLine(x1,y1,x2,y2)
+    elif symbol == 'mirror':
+        painter.drawLine(48, 10, 48, 86)
+        painter.drawPolygon([QPoint(x,y) for x,y in [(15,72),(36,25),(36,72)]])
+        painter.drawPolygon([QPoint(x,y) for x,y in [(81,72),(60,25),(60,72)]])
+    elif symbol == 'sketch':
+        painter.drawRect(14, 23, 58, 58)
+        painter.drawLine(35, 62, 80, 13)
+        painter.drawLine(35, 62, 31, 76)
+    else:
+        painter.drawRect(15, 31, 49, 49)
+        painter.drawLine(15,31,35,12); painter.drawLine(64,31,84,12)
+        painter.drawLine(35,12,84,12); painter.drawLine(84,12,84,61)
+        painter.drawLine(64,80,84,61)
+    painter.end()
+    return QIcon(pixmap)
 
 
 class WorkSignals(QObject):
@@ -124,18 +175,68 @@ class MainWindow(QMainWindow):
         top.addAction(self.undo_action)
         top.addAction(self.redo_action)
         self.addToolBarBreak()
-        model = QToolBar("Modelowanie")
-        model.setMovable(False)
-        self.addToolBar(model)
-        for name, fn in [
-            ("Prostopadłościan", self.add_box), ("Walec", self.add_cylinder),
-            ("Szkic", self.add_sketch), ("Wyciągnij", self.extrude_sketch),
-            ("Otwór", self.make_hole), ("Połącz", lambda: self.combine('union')),
-            ("Wytnij", lambda: self.combine('subtract')), ("Część wspólna", lambda: self.combine('intersect')),
-            ("Zaokrąglij", lambda: self.start_blend('fillet')), ("Fazuj", lambda: self.start_blend('chamfer')),
-            ("Przenieś / obróć", self.transform_body), ("Lustro", self.mirror_body),
-        ]:
-            model.addAction(self._action(name, fn))
+        ribbon = QToolBar("Narzędzia modelowania")
+        ribbon.setMovable(False)
+        tabs = QTabWidget()
+        tabs.setObjectName("ribbon")
+        self.tool_buttons = {}
+        groups = [
+            ("Tworzenie", "#2563eb", [
+                ("Prostopadłościan", self.add_box, "box"), ("Walec", self.add_cylinder, "circle"),
+                ("Szkic", self.add_sketch, "sketch"), ("Wyciągnij", self.extrude_sketch, "up"),
+                ("Otwór", self.make_hole, "hole")]),
+            ("Edycja brył", "#7c3aed", [
+                ("Połącz", lambda: self.combine('union'), "union"),
+                ("Wytnij", lambda: self.combine('subtract'), "cut"),
+                ("Część wspólna", lambda: self.combine('intersect'), "intersect"),
+                ("Zaokrąglij", lambda: self.start_blend('fillet'), "round"),
+                ("Fazuj", lambda: self.start_blend('chamfer'), "chamfer")]),
+            ("Przekształcenia", "#08916d", [
+                ("Przenieś / obróć", self.transform_body, "move"), ("Lustro", self.mirror_body, "mirror"),
+                ("Duplikuj", self.duplicate_body, "union"), ("Usuń", self.delete_selected, "cut")]),
+        ]
+        for title, color, entries in groups:
+            page = QWidget()
+            row = QHBoxLayout(page)
+            row.setContentsMargins(8, 5, 8, 5)
+            for name, fn, symbol in entries:
+                button = QToolButton()
+                action = self._action(name, fn)
+                action.setIcon(tool_icon(symbol, color))
+                action.setToolTip(name + " — kliknij, aby wybrać narzędzie")
+                button.setDefaultAction(action)
+                button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
+                button.setIconSize(QSize(38, 38))
+                button.setMinimumSize(108, 78)
+                button.setStyleSheet(f"QToolButton {{background: {QColor(color).lighter(190).name()}; border-bottom: 3px solid {color};}}")
+                row.addWidget(button)
+                self.tool_buttons[name] = button
+            row.addStretch()
+            tabs.addTab(page, title)
+        ribbon.addWidget(tabs)
+        self.addToolBar(ribbon)
+        self.addToolBarBreak()
+        navigation = QToolBar("Sterowanie myszą")
+        navigation.setMovable(False)
+        self.addToolBar(navigation)
+        self.mouse_modes = QButtonGroup(self)
+        for mode, title in [('select', 'Wybierz'), ('orbit', 'Obracaj'), ('pan', 'Przesuwaj widok')]:
+            button = QPushButton(title)
+            button.setCheckable(True)
+            button.setChecked(mode == 'select')
+            button.clicked.connect(lambda checked=False, m=mode: self.set_mouse_mode(m))
+            self.mouse_modes.addButton(button)
+            navigation.addWidget(button)
+        self.multi_select = QCheckBox("Wybieraj wiele")
+        self.multi_select.toggled.connect(self.set_multi_selection)
+        navigation.addWidget(self.multi_select)
+        clear = self._action("Odznacz", self.clear_selection)
+        navigation.addAction(clear)
+        navigation.addSeparator()
+        for name, label in [('iso', '3D'), ('XY', 'Z góry'), ('XZ', 'Z przodu'), ('YZ', 'Z boku')]:
+            navigation.addAction(self._action(label, lambda checked=False, n=name: self.view.set_view(n)))
+        navigation.addAction(self._action("Dopasuj", self.view.fit_all))
+        navigation.addAction(self._action("Siatka", self.toggle_grid))
         view = self.menuBar().addMenu("Widok")
         for name in ['iso', 'XY', 'XZ', 'YZ']:
             view.addAction(self._action('Izometryczny' if name == 'iso' else name, lambda checked=False, n=name: self.view.set_view(n)))
@@ -194,7 +295,7 @@ class MainWindow(QMainWindow):
         blend_layout.addLayout(buttons)
         self.blend_panel.hide()
         layout.addWidget(self.blend_panel)
-        tip = QLabel("W drzewie: Ctrl + klik zaznacza kilka brył.\nW widoku: Shift + klik dodaje krawędzie.\nF — dopasuj · Ctrl+Z — cofnij")
+        tip = QLabel("Wybierz narzędzie na kolorowej karcie u góry.\nObracaj i przesuwaj widok przyciskami nad modelem.\nWłącz „Wybieraj wiele”, aby dodawać obiekty lub krawędzie samym kliknięciem.")
         tip.setWordWrap(True)
         tip.setObjectName('tip')
         layout.addWidget(tip)
@@ -206,6 +307,12 @@ class MainWindow(QMainWindow):
 
     def _style(self):
         self.setStyleSheet("""
+        QTabWidget::pane { border: 0; background: #fff; }
+        QTabBar::tab { padding: 9px 24px; background: #eef2ff; color: #334155; }
+        QTabBar::tab:selected { background: #2563eb; color: white; }
+        QPushButton:checked { background: #2563eb; color: white; border-color: #1d4ed8; }
+        QCheckBox { padding: 8px; color: #334155; }
+        QDialog { background: #f5f8ff; }
         QMainWindow { background: #edf1f5; }
         QMenuBar, QToolBar { background: #fff; spacing: 7px; padding: 6px; border: 0; }
         QToolButton { padding: 8px; border: 1px solid transparent; border-radius: 5px; }
@@ -221,6 +328,14 @@ class MainWindow(QMainWindow):
         QLabel#tip { color: #607a91; font-size: 11px; padding: 10px 0; }
         QStatusBar { background: #fff; color: #47647d; }
         """)
+
+    def set_mouse_mode(self, mode):
+        self.view.mouse_mode = mode
+        self.view.setCursor(Qt.OpenHandCursor if mode == 'pan' else Qt.CrossCursor if mode == 'select' else Qt.SizeAllCursor)
+
+    def set_multi_selection(self, enabled):
+        self.view.multi_select = enabled
+        self.tree.setSelectionMode(QAbstractItemView.MultiSelection if enabled else QAbstractItemView.ExtendedSelection)
 
     def refresh(self, fit=False):
         live = {b.id for b in self.document.bodies}
@@ -260,6 +375,7 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(label + "…")
         for action in self.actions:
             action.setEnabled(False)
+        self.multi_select.setEnabled(False)
         self.tree.setEnabled(False)
         self.blend_panel.setEnabled(False)
         work = Work(function)
@@ -281,6 +397,7 @@ class MainWindow(QMainWindow):
         def finish():
             self.busy = False
             self.progress.hide()
+            self.multi_select.setEnabled(True)
             self.tree.setEnabled(True)
             self.blend_panel.setEnabled(True)
             for action in self.actions:
@@ -350,8 +467,10 @@ class MainWindow(QMainWindow):
         self.run_operation('Operacja na bryłach',build,lambda r:self.replace_body(base,r))
 
     def start_blend(self, kind):
+        self.set_mouse_mode("select")
+        self.mouse_modes.buttons()[0].setChecked(True)
         self.view.edge_mode=True;self.blend_panel.show();self.blend_type.setCurrentIndex(0 if kind=='fillet' else 1)
-        self.statusBar().showMessage('Kliknij krawędź bryły. Shift + klik dodaje kolejne. Następnie Zastosuj.')
+        self.statusBar().showMessage('Kliknij krawędź. Aby dodać kolejne, włącz „Wybieraj wiele”. Następnie Zastosuj.')
 
     def end_blend(self):
         self.view.edge_mode=False;self.edges.clear();self.blend_panel.hide();self.refresh()

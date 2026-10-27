@@ -45,6 +45,9 @@ class CadView(gl.GLViewWidget):
         self.selected_bodies = set()
         self.selected_edges = {}
         self.edge_mode = False
+        self.mouse_mode = "select"
+        self.multi_select = False
+        self._drag_position = None
         self._press = None
 
     def set_models(self, bodies, selected_bodies=(), selected_edges=None):
@@ -171,7 +174,22 @@ class CadView(gl.GLViewWidget):
         hit = self._hit(origin, direction)
         return hit is None or hit[0] >= np.linalg.norm(point-origin)-.25
 
+    def mouseMoveEvent(self, event):
+        if self._press and self._press[2] == Qt.LeftButton and self.mouse_mode in ('orbit', 'pan'):
+            pos = event.position()
+            previous = self._drag_position or pos
+            delta = pos - previous
+            self._drag_position = pos
+            if self.mouse_mode == 'orbit':
+                self.orbit(-delta.x(), delta.y())
+            else:
+                self.pan(delta.x(), delta.y(), 0, relative='view-upright')
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
     def mousePressEvent(self, event):
+        self._drag_position = event.position()
         self._press = (event.position().x(), event.position().y(), event.button())
         super().mousePressEvent(event)
 
@@ -181,9 +199,9 @@ class CadView(gl.GLViewWidget):
             return
         x, y, button = self._press
         self._press = None
-        if button != Qt.LeftButton or np.hypot(event.position().x()-x, event.position().y()-y)>4:
+        if self.mouse_mode != "select" or button != Qt.LeftButton or np.hypot(event.position().x()-x, event.position().y()-y)>4:
             return
-        additive = bool(event.modifiers() & Qt.ShiftModifier)
+        additive = self.multi_select or bool(event.modifiers() & Qt.ShiftModifier)
         if self.edge_mode:
             hit = self.nearest_edge(x,y)
             if hit:

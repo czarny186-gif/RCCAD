@@ -76,3 +76,12 @@ python -m PyInstaller --noconfirm RCCAD.spec
 Wynik: `dist/RCCAD Desktop/RCCAD Desktop.exe`. PyInstaller wymaga budowania
 na docelowym systemie: uruchomienie go na Linuksie nie tworzy pliku Windows EXE.
 Automatyczny proces Windows znajduje się w `.github/workflows/native-windows.yml`.
+
+## Interfejs 0.2
+
+Narzędzia wybierzesz dużymi kolorowymi przyciskami na trzech kartach.
+Przyciski Obracaj i Przesuwaj widok zmieniają działanie przeciągania lewym przyciskiem myszy.
+Wybieraj wiele pozwala zaznaczać kolejne bryły i krawędzie samym kliknięciem;
+wyłącz tę opcję, aby wrócić do pojedynczego zaznaczania.
+Wymiary nadal ustawiasz w oknach liczbowych (również strzałkami przy polach).
+Rysowanie szkiców bezpośrednio myszą nie jest jeszcze dostępne.

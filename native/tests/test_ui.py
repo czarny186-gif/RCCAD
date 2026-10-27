@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from PySide6.QtCore import Qt,QThread
-from PySide6.QtWidgets import QApplication,QMessageBox
+from PySide6.QtWidgets import QApplication,QMessageBox,QAbstractItemView
 from rccad import kernel as k
 from rccad.document import Body
 from rccad.window import MainWindow
@@ -122,6 +122,34 @@ class NativeUiTests(unittest.TestCase):
                 candidates.append(hit)
         self.assertTrue(candidates)
         self.assertTrue(all(hit[0]==body.id and hit[1] in body.mesh.edges for hit in candidates))
+
+    def test_graphical_buttons_create_body_and_choose_navigation(self):
+        from PySide6.QtTest import QTest
+        with patch('rccad.window.values_dialog', return_value={'x':20,'y':15,'z':10}):
+            QTest.mouseClick(self.window.tool_buttons['Prostopadłościan'], Qt.LeftButton)
+        self.wait()
+        self.assertEqual(len(self.window.document.bodies), 1)
+        self.assertAlmostEqual(self.window.document.bodies[0].shape.Volume(), 3000)
+        for button, mode in zip(self.window.mouse_modes.buttons(), ['select','orbit','pan']):
+            QTest.mouseClick(button, Qt.LeftButton)
+            self.assertEqual(self.window.view.mouse_mode, mode)
+        self.window.start_blend('fillet')
+        self.assertEqual(self.window.view.mouse_mode, 'select')
+        self.assertTrue(self.window.mouse_modes.buttons()[0].isChecked())
+
+    def test_multiple_selection_toggle_needs_no_keyboard(self):
+        self.add_box()
+        first = self.window.document.bodies[0]
+        second = Body('Druga', k.box(5,5,5)).prepared()
+        self.window.add_prepared(second)
+        self.window.refresh()
+        self.window.multi_select.setChecked(True)
+        self.assertTrue(self.window.view.multi_select)
+        self.assertEqual(self.window.tree.selectionMode(), QAbstractItemView.MultiSelection)
+        self.window.body_clicked(first.id, self.window.view.multi_select)
+        self.assertEqual(set(self.window.selected), {first.id,second.id})
+        self.window.multi_select.setChecked(False)
+        self.assertFalse(self.window.view.multi_select)
 
     def test_visibility_is_reversible(self):
         self.add_box()
