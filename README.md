@@ -32,6 +32,7 @@ Testy w przygotowanym środowisku:
 python tests/test_browser.py
 python tests/test_edge_tools.py
 python tests/test_corner_blends.py
+python tests/test_stacked_extrusion.py
 ```
 
 Wymagania testów: Python, Chromium oraz biblioteki z `tests/requirements.txt`.

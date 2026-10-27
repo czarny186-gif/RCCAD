@@ -185,3 +185,41 @@ Nowy zestaw uruchamia się poleceniem `python tests/test_corner_blends.py`.
 
 Automatyczne połączenie dotyczy rozpoznanych, równych promieni przy narożnikach
 prostokątnych. Nie oznacza ogólnej obsługi dowolnych promieni i dowolnych kątów.
+
+## HTML: wycinanie profilu po drugim wyciągnięciu — 27 października 2026
+
+Odtworzono zgłoszenie w starszym programie HTML: podstawa, drugie wyciągnięcie
+na górnej ścianie, połączenie, a następnie wycięcie kolejnym profilem.
+Przełączenie operacji z Nowa/Połącz na Wytnij zmieniało znak wpisanej odległości,
+chociaż kierunek wycięcia był już odwracany względem normalnej ściany. Te dwa
+odwrócenia znosiły się. Przy głębokości 50 mm profil na wysokości 40 mm
+wyciągał narzędzie do wysokości 90 mm zamiast przecinać model. Przykładowa
+objętość pozostawała 31 000 mm³, a operacja mimo tego była zatwierdzana.
+
+Poprawki:
+
+- Zmiana rodzaju operacji pozostawia wpisaną odległość. Dodatnia głębokość
+  wycięcia na wskazanej ścianie kieruje narzędzie do wnętrza. W trybie dwóch
+  stron wartości pierwszej i drugiej strony nie są zamieniane.
+- Wybieranie profilu uwzględnia najpierw rzeczywistą głębokość pod kursorem,
+  a dopiero na tej samej płaszczyźnie powierzchnię komórki. Mniejszy stary szkic
+  pod modelem nie przechwytuje wyboru nowego, większego profilu na górze.
+- Narzędzie tylko dotykające bryły lub operacja bez zmiany objętości nie tworzą
+  pozornego wycięcia ani wpisu historii. Panel pozostaje dostępny do korekty.
+- Nieszczelny wynik Boolean nie zastępuje modelu: operacja jest wycofywana.
+- Panel wyciągnięcia wyjaśnia dodatni kierunek wycinania.
+
+Weryfikacja: **19/19 nowych scenariuszy** oraz **125/125 wcześniejszych**,
+łącznie **144/144**. Zestaw `python tests/test_stacked_extrusion.py` uruchamia
+Chromium i korzysta z rzeczywistego wyboru ściany, kliknięcia profilu, zmiany
+operacji w liście i przycisku Zastosuj.
+
+Sprawdzono prostokąt, okrąg, elipsę, sześciokąt, fasolkę, prostokąt trzypunktowy,
+trójkąt i wklęsły profil L połączonej bryły. Sprawdzono objętość usuniętego
+materiału, szczelność siatki, cofanie i ponawianie, wszystkie sześć kierunków
+ścian, niezależne głębokości dwóch stron, brak zmian przy narzędziu skierowanym
+na zewnątrz oraz wycofanie nieprawidłowego wyniku. Dla profili krzywoliniowych
+uwzględniono dotychczasową aproksymację siatki programu HTML.
+
+Ten sam nowy zestaw na pliku sprzed poprawki: **4/19 zaliczonych**. Poprawki
+tej sekcji dotyczą HTML; aplikacja EXE nie została zmieniona w tym zadaniu.
