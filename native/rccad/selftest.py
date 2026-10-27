@@ -24,6 +24,15 @@ def run(report_path=None):
     wire = k.sketch('rectangle','XY',20,10)
     assert abs(k.extrude(wire,'XY',10).Volume()-2000) < 1e-5
     checks.append('native sketch extrusion')
+    drag = k.sketch_from_drag('rectangle','XZ',0,0,20,10)
+    assert abs(k.extrude(k.sketch(**drag),'XZ',5).Volume()-1000) < 1e-5
+    checks.append('mouse sketch geometry')
+    plain = k.box(40,30,20)
+    vertical = [i for i,e in enumerate(plain.Edges()) if abs(e.startPoint().z-e.endPoint().z) > 10]
+    outline = k.blend(plain, vertical, 5)
+    top = {i for i,e in enumerate(outline.Edges()) if abs(e.startPoint().z-20) < 1e-6 and abs(e.endPoint().z-20) < 1e-6}
+    assert len(top) == 8 and k.edge_chain(outline, min(top)) == top
+    checks.append('tangent edge chain')
     doc=Document();body=Body('Zaokrąglona kostka',rounded).prepared();doc.commit([body])
     doc.undo();assert not doc.bodies;doc.redo();assert len(doc.bodies)==1
     with tempfile.TemporaryDirectory(prefix='rccad-check-') as directory:

@@ -69,6 +69,30 @@ class NativeUiTests(unittest.TestCase):
         self.assertEqual(self.warning_mock.call_count,1)
         self.assertTrue(self.window.tree.isEnabled())
 
+    def test_mouse_sketch_creates_visible_sketch_on_plane(self):
+        self.window.add_sketch()
+        self.assertTrue(self.window.view.plane_pick)
+        self.window.plane_picked('XZ')
+        self.assertEqual(self.window.view.sketch_plane,'XZ')
+        self.window.sketch_drawn('XZ','rectangle',0,0,20,10)
+        self.wait()
+        body=self.window.document.bodies[0]
+        self.assertEqual((body.kind,body.plane),('sketch','XZ'))
+        self.window.end_sketch()
+        self.assertIsNone(self.window.view.sketch_plane)
+
+    def test_shift_click_selects_tangent_chain_and_plain_click_one_edge(self):
+        plain=k.box(40,30,20)
+        vertical=[i for i,e in enumerate(plain.Edges()) if abs(e.startPoint().z-e.endPoint().z)>10]
+        rounded=k.blend(plain,vertical,5)
+        top=[i for i,e in enumerate(rounded.Edges()) if abs(e.startPoint().z-20)<1e-6 and abs(e.endPoint().z-20)<1e-6]
+        body=Body('Zaokrąglona',rounded).prepared()
+        self.window.document.commit([body]);self.window.refresh()
+        self.window.edge_clicked(body.id,top[0],False)
+        self.assertEqual(self.window.edges,{body.id:{top[0]}})
+        self.window.edge_clicked(body.id,top[0],False,True)
+        self.assertEqual(self.window.edges,{body.id:set(top)})
+
     def test_edge_selection_and_fillet_apply(self):
         self.add_box();body=self.window.document.bodies[0]
         self.window.start_blend('fillet')

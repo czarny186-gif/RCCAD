@@ -63,6 +63,68 @@ def sketch(kind, plane, width, height=0, x=0, y=0, sides=6):
     raise CadError("Nieznany typ szkicu.")
 
 
+PLANE_AXES = {"XY": (0, 1), "XZ": (0, 2), "YZ": (1, 2)}
+
+
+def to_world(plane, u, v):
+    """Współrzędne szkicu (U, V) -> punkt 3D; zgodne z cq.Workplane('XY'/'XZ'/'YZ')."""
+    return {"XY": (u, v, 0.0), "XZ": (u, 0.0, v), "YZ": (0.0, u, v)}[plane]
+
+
+def sketch_from_drag(kind, plane, u0, v0, u1, v1, sides=6):
+    """Argumenty dla sketch() z przeciągnięcia myszą: prostokąt = dwa rogi, okrąg i wielokąt = środek i punkt na obwodzie."""
+    if plane not in PLANE_AXES:
+        raise CadError("Nieznana płaszczyzna szkicu.")
+    u0, v0, u1, v1 = (float(x) for x in (u0, v0, u1, v1))
+    if not all(isfinite(x) for x in (u0, v0, u1, v1)):
+        raise CadError("Nieprawidłowe współrzędne szkicu.")
+    if kind == "rectangle":
+        if abs(u1 - u0) < 1e-4 or abs(v1 - v0) < 1e-4:
+            raise CadError("Prostokąt jest za mały.")
+        return dict(kind=kind, plane=plane, width=abs(u1 - u0), height=abs(v1 - v0), x=(u0 + u1) / 2, y=(v0 + v1) / 2)
+    if kind in ("circle", "polygon"):
+        radius = float(np.hypot(u1 - u0, v1 - v0))
+        if radius < 1e-4:
+            raise CadError("Figura jest za mała.")
+        return dict(kind=kind, plane=plane, width=2 * radius, x=u0, y=v0, sides=int(sides))
+    raise CadError("Nieznany typ szkicu.")
+
+
+def edge_chain(shape, index, max_angle=8.0):
+    """Indeksy krawędzi tworzących łańcuch styczny (G1) z krawędzią `index` - jak Shift+klik w wersji HTML."""
+    edges = shape.Edges()
+    if not 0 <= index < len(edges):
+        raise CadError("Nieprawidłowa krawędź.")
+    key = lambda p: tuple(round(c, 4) for c in p.toTuple())
+    joints = {}
+    for i, edge in enumerate(edges):
+        if edge.Length() < 1e-6:
+            continue
+        for param in (0.0, 1.0):
+            joints.setdefault(key(edge.positionAt(param)), []).append((i, param))
+    limit = np.cos(np.radians(max_angle))
+    def direction(i, param):
+        t = edges[i].tangentAt(param)
+        v = np.array(t.toTuple(), dtype=float)
+        n = np.linalg.norm(v)
+        return v / n if n > 1e-12 else None
+    chain, stack = {index}, [index]
+    while stack:
+        i = stack.pop()
+        for param in (0.0, 1.0):
+            here = direction(i, param)
+            if here is None:
+                continue
+            for j, pj in joints.get(key(edges[i].positionAt(param)), []):
+                if j in chain:
+                    continue
+                there = direction(j, pj)
+                if there is not None and abs(float(here @ there)) >= limit:
+                    chain.add(j)
+                    stack.append(j)
+    return chain
+
+
 NORMALS = {"XY": (0, 0, 1), "XZ": (0, -1, 0), "YZ": (1, 0, 0)}
 
 

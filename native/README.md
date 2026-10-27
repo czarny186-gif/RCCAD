@@ -85,3 +85,15 @@ Wybieraj wiele pozwala zaznaczać kolejne bryły i krawędzie samym kliknięciem
 wyłącz tę opcję, aby wrócić do pojedynczego zaznaczania.
 Wymiary nadal ustawiasz w oknach liczbowych (również strzałkami przy polach).
 Rysowanie szkiców bezpośrednio myszą nie jest jeszcze dostępne.
+
+## Interfejs 0.3 - wygląd i obsługa jak w wersji HTML
+
+- Jasne tło, niebieska siatka, bryły w jasnoszarym kolorze z czarnym obrysem; szkice na niebiesko.
+- Pływająca kostka widoku (Z, -Z, X, -X, Y, -Y, 3D), przyciski cofnij / ponów, dom oraz przesuwanie / obrót nad widokiem.
+- Szkic rysowany myszą: **Szkic** -> kliknij płaszczyznę (XY niebieska, XZ zielona, YZ czerwona) -> przeciągnij prostokąt,
+  okrąg lub wielokąt. Siatka przyciąga punkty, Alt wyłącza przyciąganie. Szkice zostają widoczne po wyjściu z rysowania.
+  Dotychczasowe okno z wymiarami pozostało jako **Szkic z wymiarów**.
+- **Wyciągnij**: nowa bryła, połączenie z bryłą albo wycięcie z bryły; opcjonalnie symetrycznie.
+- Krawędzie przy zaokrągleniu i fazowaniu: klik = jedna krawędź (podświetlana pod kursorem), **Shift + klik** = cały łańcuch
+  styczny, Ctrl + klik (lub „Wybieraj wiele") dodaje do zaznaczenia.
+- Widok: lewy przycisk obraca, prawy przycisk lub Shift + przeciąganie przesuwa, rolka zbliża.

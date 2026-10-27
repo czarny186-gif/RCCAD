@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 from . import __version__, kernel
 from .document import Body, Document
 from .viewport import CadView
+from .overlay import ViewOverlay
 
 
 def tool_icon(symbol, color):
@@ -133,12 +134,16 @@ class MainWindow(QMainWindow):
         self.view.edgeClicked.connect(self.edge_clicked)
         self.view.bodyClicked.connect(self.body_clicked)
         self.view.selectionCleared.connect(self.clear_selection)
+        self.view.planeClicked.connect(self.plane_picked)
+        self.view.sketchDrawn.connect(self.sketch_drawn)
+        self.view.sketchInfo.connect(lambda text: self.statusBar().showMessage(text))
+        self.overlay = ViewOverlay(self.view, self)
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.setMaximumWidth(180)
         self.progress.hide()
         self.statusBar().addPermanentWidget(self.progress)
-        self.statusBar().showMessage("Gotowy · mm · lewy przycisk: obrót / wybór · środkowy: przesuwanie · rolka: zoom")
+        self.statusBar().showMessage("Gotowy · mm · lewy przycisk: obrót / wybór · prawy lub Shift + przeciąganie: przesuwanie · rolka: zoom")
         self._style()
         self.refresh()
 
@@ -183,7 +188,7 @@ class MainWindow(QMainWindow):
         groups = [
             ("Tworzenie", "#2563eb", [
                 ("Prostopadłościan", self.add_box, "box"), ("Walec", self.add_cylinder, "circle"),
-                ("Szkic", self.add_sketch, "sketch"), ("Wyciągnij", self.extrude_sketch, "up"),
+                ("Szkic", self.add_sketch, "sketch"), ("Szkic z wymiarów", self.add_sketch_dimensions, "sketch"), ("Wyciągnij", self.extrude_sketch, "up"),
                 ("Otwór", self.make_hole, "hole")]),
             ("Edycja brył", "#7c3aed", [
                 ("Połącz", lambda: self.combine('union'), "union"),
@@ -269,6 +274,30 @@ class MainWindow(QMainWindow):
         self.properties.setMinimumHeight(110)
         self.properties.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.properties)
+        self.sketch_panel = QWidget()
+        sketch_layout = QVBoxLayout(self.sketch_panel)
+        sketch_layout.setContentsMargins(0, 12, 0, 8)
+        self.sketch_tool = QComboBox()
+        self.sketch_tool.addItem("Prostokąt (dwa rogi)", "rectangle")
+        self.sketch_tool.addItem("Okrąg (środek i promień)", "circle")
+        self.sketch_tool.addItem("Wielokąt (środek i promień)", "polygon")
+        self.sketch_tool.currentIndexChanged.connect(self.sketch_tool_changed)
+        sketch_layout.addWidget(self.sketch_tool)
+        self.sketch_sides = QDoubleSpinBox()
+        self.sketch_sides.setRange(3, 128)
+        self.sketch_sides.setDecimals(0)
+        self.sketch_sides.setValue(6)
+        self.sketch_sides.setPrefix("Boki: ")
+        self.sketch_sides.valueChanged.connect(self.sketch_tool_changed)
+        sketch_layout.addWidget(self.sketch_sides)
+        self.sketch_hint = QLabel("")
+        self.sketch_hint.setWordWrap(True)
+        sketch_layout.addWidget(self.sketch_hint)
+        done = QPushButton("Zakończ szkic")
+        done.clicked.connect(self.end_sketch)
+        sketch_layout.addWidget(done)
+        self.sketch_panel.hide()
+        layout.addWidget(self.sketch_panel)
         self.blend_panel = QWidget()
         blend_layout = QVBoxLayout(self.blend_panel)
         blend_layout.setContentsMargins(0, 12, 0, 8)
@@ -282,7 +311,7 @@ class MainWindow(QMainWindow):
         self.blend_size.setValue(3)
         self.blend_size.setSuffix(" mm")
         blend_layout.addWidget(self.blend_size)
-        self.edge_count = QLabel("Kliknij krawędź. Shift + klik dodaje kolejne.")
+        self.edge_count = QLabel("Kliknij krawędź. Shift + klik zaznacza cały łańcuch styczny.")
         self.edge_count.setWordWrap(True)
         blend_layout.addWidget(self.edge_count)
         buttons = QHBoxLayout()
@@ -306,31 +335,37 @@ class MainWindow(QMainWindow):
         self.model_dock = dock
 
     def _style(self):
+        # paleta z wersji HTML: jasne tło #f3f6fc, granat #2c4062, niebieski #3b82f6
         self.setStyleSheet("""
         QTabWidget::pane { border: 0; background: #fff; }
-        QTabBar::tab { padding: 9px 24px; background: #eef2ff; color: #334155; }
-        QTabBar::tab:selected { background: #2563eb; color: white; }
-        QPushButton:checked { background: #2563eb; color: white; border-color: #1d4ed8; }
-        QCheckBox { padding: 8px; color: #334155; }
-        QDialog { background: #f5f8ff; }
-        QMainWindow { background: #edf1f5; }
+        QTabBar::tab { padding: 9px 24px; background: #eaf0fa; color: #2c4062; }
+        QTabBar::tab:selected { background: #2c4062; color: white; }
+        QPushButton:checked { background: #2c4062; color: white; border-color: #2c4062; }
+        QCheckBox { padding: 8px; color: #2c4062; }
+        QDialog { background: #f3f6fc; }
+        QMainWindow { background: #f3f6fc; }
         QMenuBar, QToolBar { background: #fff; spacing: 7px; padding: 6px; border: 0; }
-        QToolButton { padding: 8px; border: 1px solid transparent; border-radius: 5px; }
-        QToolButton:hover { background: #e6f0fb; border-color: #bfd2e7; }
-        QDockWidget { color: #23435f; font-weight: 600; }
+        QToolButton { padding: 8px; border: 1px solid transparent; border-radius: 10px; }
+        QToolButton:hover { background: #e8f0fb; border-color: #cfd9e6; }
+        QDockWidget { color: #2c4062; font-weight: 600; }
         QDockWidget QWidget { background: #fff; }
         QTreeWidget { border: 0; alternate-background-color: #f3f6fa; }
         QTreeWidget::item { padding: 7px 0; }
-        QTreeWidget::item:selected { background: #dcecff; color: #173f68; }
-        QPushButton { padding: 8px 12px; border: 1px solid #b8c9da; border-radius: 5px; background: #f3f7fb; }
-        QPushButton:hover { background: #dcecff; }
-        QDoubleSpinBox, QComboBox { padding: 6px; border: 1px solid #b8c9da; border-radius: 4px; }
+        QTreeWidget::item:selected { background: #dbe8fb; color: #1d3557; }
+        QPushButton { padding: 8px 12px; border: 1px solid #cfd9e6; border-radius: 10px; background: #fff; }
+        QPushButton:hover { background: #e8f0fb; }
+        QDoubleSpinBox, QComboBox { padding: 6px; border: 1px solid #cfd9e6; border-radius: 8px; }
         QLabel#tip { color: #607a91; font-size: 11px; padding: 10px 0; }
         QStatusBar { background: #fff; color: #47647d; }
         """)
 
     def set_mouse_mode(self, mode):
         self.view.mouse_mode = mode
+        buttons = self.mouse_modes.buttons()
+        index = ['select', 'orbit', 'pan'].index(mode)
+        if len(buttons) > index:
+            buttons[index].setChecked(True)
+        self.overlay.sync_mode(mode)
         self.view.setCursor(Qt.OpenHandCursor if mode == 'pan' else Qt.CrossCursor if mode == 'select' else Qt.SizeAllCursor)
 
     def set_multi_selection(self, enabled):
@@ -358,7 +393,8 @@ class MainWindow(QMainWindow):
         self.undo_action.setEnabled(self.document.can_undo and not self.busy)
         self.redo_action.setEnabled(self.document.can_redo and not self.busy)
         self.setWindowTitle(f"{'● ' if self.document.dirty else ''}{self.document.path.name if self.document.path else 'Nowy projekt'} — RCCAD Desktop")
-        self.edge_count.setText(f"Zaznaczone krawędzie: {sum(map(len,self.edges.values()))}\nShift + klik dodaje kolejne.")
+        self.edge_count.setText(f"Zaznaczone krawędzie: {sum(map(len,self.edges.values()))}\nKlik: jedna krawędź · Shift + klik: cały łańcuch styczny · Ctrl + klik: dodaje do zaznaczenia.")
+        self.overlay.sync_history(self.document.can_undo and not self.busy, self.document.can_redo and not self.busy)
         body = self.document.get(self.selected[0]) if self.selected else None
         if body:
             bounds = kernel.bounds(body.shape)
@@ -432,7 +468,7 @@ class MainWindow(QMainWindow):
         if v:
             self.run_operation("Tworzenie walca",lambda: Body('Walec',kernel.cylinder(**v)).prepared(),self.add_prepared,True)
 
-    def add_sketch(self):
+    def add_sketch_dimensions(self):
         dialog=QDialog(self);dialog.setWindowTitle("Nowy szkic")
         form=QFormLayout(dialog);kind=QComboBox();kind.addItem('Prostokąt','rectangle');kind.addItem('Okrąg','circle');kind.addItem('Wielokąt','polygon')
         plane=QComboBox();plane.addItems(['XY','XZ','YZ']);form.addRow('Figura',kind);form.addRow('Płaszczyzna',plane)
@@ -444,11 +480,81 @@ class MainWindow(QMainWindow):
         values={k:w.value() for k,w in controls.items()};p=plane.currentText();k=kind.currentData()
         self.run_operation("Tworzenie szkicu",lambda: Body('Szkic '+p,kernel.sketch(k,p,**values),'sketch',p).prepared(),self.add_prepared,True)
 
+    # ---------- szkic rysowany myszą (jak w wersji HTML) ----------
+    def add_sketch(self):
+        if self.busy:return
+        self.end_blend()
+        self.view.sketch_plane=None;self.view.sketch_tool=None;self.view.plane_pick=True
+        self.view.show_planes(True)
+        self.set_mouse_mode('select')
+        self.sketch_panel.show()
+        self.sketch_hint.setText("1. Kliknij płaszczyznę XY, XZ albo YZ.\n2. Przeciągnij myszą, aby narysować figurę (Alt wyłącza przyciąganie).\n3. Szkice zostają widoczne; użyj „Wyciągnij”.")
+        self.statusBar().showMessage("Szkic: kliknij płaszczyznę, na której chcesz rysować.")
+
+    def sketch_tool_changed(self,*_):
+        self.view.sketch_sides=int(self.sketch_sides.value())
+        if self.view.sketch_plane:self.view.sketch_tool=self.sketch_tool.currentData()
+        self.sketch_sides.setEnabled(self.sketch_tool.currentData()=='polygon')
+
+    def plane_picked(self,name):
+        self.view.plane_pick=False
+        self.view.sketch_plane=name
+        self.view.sketch_tool=self.sketch_tool.currentData()
+        self.view.sketch_sides=int(self.sketch_sides.value())
+        self.view.show_planes(True,only=name)
+        self.view.set_view(name)
+        self.view.setCursor(Qt.CrossCursor)
+        self.sketch_hint.setText(f"Płaszczyzna {name}. Przeciągnij myszą, aby narysować figurę. Alt wyłącza przyciąganie do siatki.")
+        self.statusBar().showMessage(f"Szkic na płaszczyźnie {name}: przeciągnij myszą.")
+
+    def sketch_drawn(self,plane,kind,u0,v0,u1,v1):
+        if self.busy:return
+        try:
+            values=kernel.sketch_from_drag(kind,plane,u0,v0,u1,v1,int(self.sketch_sides.value()))
+        except kernel.CadError as exc:
+            self.statusBar().showMessage(str(exc),5000);return
+        name='Szkic '+plane
+        self.run_operation("Tworzenie szkicu",lambda: Body(name,kernel.sketch(**values),'sketch',plane).prepared(),self.add_prepared)
+
+    def end_sketch(self):
+        if self.sketch_panel.isHidden() and not self.view.plane_pick and not self.view.sketch_plane:return
+        self.view.sketch_plane=None;self.view.sketch_tool=None;self.view.plane_pick=False
+        self.view.show_planes(False)
+        self.view.setCursor(Qt.ArrowCursor)
+        self.sketch_panel.hide()
+        self.statusBar().showMessage("Szkic zakończony.",4000)
+
     def extrude_sketch(self):
         body=self.selected_body('sketch')
         if not body:return
-        v=values_dialog(self,'Wyciągnięcie',[('distance','Odległość (mm)',20,-1e6)])
-        if v:self.run_operation('Wyciąganie szkicu',lambda: Body('Wyciągnięcie',kernel.extrude(body.shape,body.plane,**v)).prepared(),self.add_prepared,True)
+        solids=[b for b in self.document.bodies if b.kind=='solid']
+        dialog=QDialog(self);dialog.setWindowTitle('Wyciągnięcie');form=QFormLayout(dialog)
+        distance=QDoubleSpinBox();distance.setRange(-1e6,1e6);distance.setDecimals(3);distance.setValue(20);distance.setSuffix(' mm');form.addRow('Odległość (ujemna: w drugą stronę)',distance)
+        operation=QComboBox();operation.addItem('Nowa bryła','new')
+        if solids:operation.addItem('Połącz z bryłą','union');operation.addItem('Wytnij z bryły','subtract')
+        form.addRow('Operacja',operation)
+        target=QComboBox()
+        for b in solids:target.addItem(b.name,b.id)
+        if self.selected:
+            for k in range(target.count()):
+                if target.itemData(k) in self.selected:target.setCurrentIndex(k)
+        target.setEnabled(False);form.addRow('Bryła docelowa',target)
+        operation.currentIndexChanged.connect(lambda *_:target.setEnabled(operation.currentData()!='new'))
+        symmetric=QCheckBox('Symetrycznie w obie strony');form.addRow(symmetric)
+        buttons=QDialogButtonBox(QDialogButtonBox.Ok|QDialogButtonBox.Cancel);buttons.accepted.connect(dialog.accept);buttons.rejected.connect(dialog.reject);form.addRow(buttons)
+        if dialog.exec()!=QDialog.Accepted:return
+        op=operation.currentData();base=self.document.get(target.currentData()) if op!='new' else None
+        d=distance.value();sym=symmetric.isChecked()
+        def build():
+            tool=kernel.extrude(body.shape,body.plane,d,sym)
+            if base is None:
+                return [*self.document.bodies,Body('Wyciągnięcie',tool).prepared()]
+            result=base.changed(kernel.boolean(op,base.shape,[tool]))
+            return [result if b.id==base.id else b for b in self.document.bodies]
+        def apply(bodies):
+            self.document.commit(bodies)
+            self.selected=[bodies[-1].id] if base is None else [base.id]
+        self.run_operation('Wyciąganie szkicu',build,apply,True)
 
     def make_hole(self):
         body=self.selected_body()
@@ -469,6 +575,7 @@ class MainWindow(QMainWindow):
     def start_blend(self, kind):
         self.set_mouse_mode("select")
         self.mouse_modes.buttons()[0].setChecked(True)
+        self.end_sketch()
         self.view.edge_mode=True;self.blend_panel.show();self.blend_type.setCurrentIndex(0 if kind=='fillet' else 1)
         self.statusBar().showMessage('Kliknij krawędź. Aby dodać kolejne, włącz „Wybieraj wiele”. Następnie Zastosuj.')
 
@@ -520,13 +627,17 @@ class MainWindow(QMainWindow):
         else:self.selected=[identifier]
         self.edges={};self.refresh()
 
-    def edge_clicked(self, identifier, index, additive):
+    def edge_clicked(self, identifier, index, additive, chain=False):
         if self.busy:return
         body=self.document.get(identifier)
         if not body or body.kind!='solid':return
-        if not additive or identifier not in self.edges:self.edges={identifier:{index}}
-        elif index in self.edges[identifier]:self.edges[identifier].remove(index)
-        else:self.edges[identifier].add(index)
+        picked={index}
+        if chain:
+            try:picked=kernel.edge_chain(body.shape,index)
+            except Exception:picked={index}
+        if not additive or identifier not in self.edges:self.edges={identifier:set(picked)}
+        elif picked<=self.edges[identifier]:self.edges[identifier]-=picked
+        else:self.edges[identifier]|=picked
         self.selected=[identifier];self.refresh()
 
     def tree_selection(self):
@@ -594,7 +705,7 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self,event):
         if event.key()==Qt.Key_Escape and not self.busy:
-            self.end_blend();event.accept();return
+            self.end_blend();self.end_sketch();event.accept();return
         super().keyPressEvent(event)
 
     def closeEvent(self,event):

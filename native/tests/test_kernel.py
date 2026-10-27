@@ -71,6 +71,27 @@ class KernelTests(unittest.TestCase):
         self.assertAlmostEqual(s.BoundingBox().zmin,-5)
         self.assertGreater(k.extrude(k.sketch('polygon','XY',10,sides=6),'XY',10).Volume(),0)
 
+    def test_sketch_from_drag_uses_workplane_axes(self):
+        for plane in ('XY','XZ','YZ'):
+            with self.subTest(plane=plane):
+                args=k.sketch_from_drag('rectangle',plane,10,20,40,50)
+                box=k.bounds(k.sketch(**args))
+                c0,c1=k.to_world(plane,10,20),k.to_world(plane,40,50)
+                for got,want in zip((box.xmin,box.ymin,box.zmin),map(min,zip(c0,c1))):self.assertAlmostEqual(got,want,places=5)
+                for got,want in zip((box.xmax,box.ymax,box.zmax),map(max,zip(c0,c1))):self.assertAlmostEqual(got,want,places=5)
+        circle=k.sketch_from_drag('circle','XY',5,5,8,9)
+        self.assertAlmostEqual(circle['width'],10)
+        with self.assertRaises(k.CadError):k.sketch_from_drag('rectangle','XY',0,0,0,5)
+
+    def test_edge_chain_follows_tangent_outline(self):
+        plain=k.box(40,30,20)
+        self.assertEqual(k.edge_chain(plain,0),{0})
+        vertical=[i for i,e in enumerate(plain.Edges()) if abs(e.startPoint().z-e.endPoint().z)>10]
+        rounded=k.blend(plain,vertical,5)
+        top=[i for i,e in enumerate(rounded.Edges()) if abs(e.startPoint().z-20)<1e-6 and abs(e.endPoint().z-20)<1e-6]
+        self.assertEqual(len(top),8)
+        self.assertEqual(k.edge_chain(rounded,top[0]),set(top))
+
     def test_transform_and_mirror(self):
         a=k.box(10,20,30);b=k.transform(a,(2,3,4),(20,30,40));c=k.mirror(a,'YZ')
         self.assertAlmostEqual(a.Volume(),b.Volume(),places=5)
